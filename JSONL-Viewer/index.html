@@ -158,6 +158,7 @@
         .msg-actions button { background: transparent; border: 1px solid var(--border-color); color: var(--meta-color); padding: 4px 14px; margin-left: 5px; border-radius: 4px; cursor: pointer; font-size: 1.1em; display: flex; align-items: center; justify-content: center; }
         .floor-id { background: var(--accent-color); color: white; padding: 2px 8px; border-radius: 12px; font-size: 0.85em; margin-right: 8px; }
         .user-msg .floor-id:first-of-type { background: var(--user-accent-color) !important; } 
+        .model-tag { display: inline-flex; align-items: center; font-size: 0.8em; font-weight: 500; background: var(--btn-bg); color: var(--meta-color); border: 1px solid var(--border-color); padding: 1px 7px; border-radius: 10px; margin-left: 8px; vertical-align: middle; white-space: nowrap; max-width: 240px; overflow: hidden; text-overflow: ellipsis; }
 
         /* ================= 編輯與內容 ================= */
         .edit-textarea { width: 100%; height: 400px; min-height: 200px; background: var(--bg-color); color: var(--text-color); border: 1px solid var(--accent-color); border-radius: 4px; padding: 10px; font-family: inherit; font-size: var(--content-font-size); resize: vertical; box-sizing: border-box; margin-top: 5px; outline: none; }
@@ -271,8 +272,8 @@
         </div>
     </div>
 
-    <!-- 預設在手機版加上 collapsed 類別避免載入遮擋 -->
-    <div class="floating-panel collapsed" id="floatingPanel">
+    <!-- 懸浮控制面板 -->
+    <div class="floating-panel" id="floatingPanel">
         <div class="panel-toggle-btn" id="panelToggleBtn" title="收合/展開面板">▶</div>
         <div class="panel-content">
             <div class="nav-section">
@@ -390,6 +391,31 @@
         let searchResults = [];
         let currentSearchFloorIndex = -1;
         let currentMarkIndex = 0;
+
+        function getModelName(item) {
+            if (!item || item.is_user) return '';
+            const swipeId = item.swipe_id ?? 0;
+            if (item.swipe_info && item.swipe_info[swipeId]) {
+                const sw = item.swipe_info[swipeId];
+                if (sw.model) return sw.model;
+                if (sw.extra?.model) return sw.extra.model;
+                if (sw.gen_metadata?.model) return sw.gen_metadata.model;
+            }
+            if (item.extra?.swipes_info && item.extra.swipes_info[swipeId]) {
+                const sw = item.extra.swipes_info[swipeId];
+                if (sw.model) return sw.model;
+                if (sw.extra?.model) return sw.extra.model;
+            }
+            if (item.extra?.model) return item.extra.model;
+            if (item.extra?.api_model) return item.extra.api_model;
+            if (item.extra?.model_name) return item.extra.model_name;
+            if (item.gen_metadata?.model) return item.gen_metadata.model;
+            if (item.gen_metadata?.model_name) return item.gen_metadata.model_name;
+            if (item.extra?.gen_metadata?.model) return item.extra.gen_metadata.model;
+            if (item.model) return item.model;
+            if (item.model_name) return item.model_name;
+            return '';
+        }
 
         function highlightText(html, keyword) {
             if (!keyword) return html;
@@ -704,21 +730,30 @@
                 } catch (err) { alert(`下載失敗`); }
             });
 
+            // 依螢幕寬度初始化側邊面板 (電腦版預設展開，手機版預設收合)
+            const floatingPanel = document.getElementById('floatingPanel');
+            const panelToggleBtn = document.getElementById('panelToggleBtn');
+            if (window.innerWidth <= 700) {
+                floatingPanel.classList.add('collapsed');
+                panelToggleBtn.textContent = '◀';
+            } else {
+                floatingPanel.classList.remove('collapsed');
+                panelToggleBtn.textContent = '▶';
+            }
+
             // 面板收合按鈕 (電腦版左側箭頭)
-            document.getElementById('panelToggleBtn').addEventListener('click', () => {
-                const panel = document.getElementById('floatingPanel');
-                panel.classList.toggle('collapsed');
-                const btn = document.getElementById('panelToggleBtn');
-                if (panel.classList.contains('collapsed')) {
-                    btn.textContent = '◀';
+            panelToggleBtn.addEventListener('click', () => {
+                floatingPanel.classList.toggle('collapsed');
+                if (floatingPanel.classList.contains('collapsed')) {
+                    panelToggleBtn.textContent = '◀';
                 } else {
-                    btn.textContent = '▶';
+                    panelToggleBtn.textContent = '▶';
                 }
             });
 
             // 手機版頂端選單按鈕
             document.getElementById('btnMobileMenu').addEventListener('click', () => {
-                document.getElementById('floatingPanel').classList.toggle('collapsed');
+                floatingPanel.classList.toggle('collapsed');
             });
 
             // 搜尋列相關事件
@@ -905,13 +940,15 @@
 
                 const dateObj = new Date(item.send_date); const timeString = isNaN(dateObj) ? item.send_date : dateObj.toLocaleString('zh-TW', { hour12: false });
                 const meta = document.createElement('div'); meta.className = 'meta'; const sysTag = item.is_system ? ' [系統]' : '';
+                const modelName = getModelName(item);
+                const modelTag = modelName ? `<span class="model-tag" title="生成模型: ${modelName}">🤖 ${modelName}</span>` : '';
                 
                 // --- 重構區塊以實現 Flexbox 排版 ---
                 const idsDiv = document.createElement('div'); idsDiv.className = 'meta-ids';
                 idsDiv.innerHTML = `<span class="floor-id" style="border-top-right-radius:0; border-bottom-right-radius:0; margin-right:0;">酒館: #${localId}</span><span class="floor-id" style="background:#6b7280; border-top-left-radius:0; border-bottom-left-radius:0; margin-left:0;">總計: #${originalId}</span>`;
                 
                 const nameTimeDiv = document.createElement('div'); nameTimeDiv.className = 'meta-name-time';
-                nameTimeDiv.innerHTML = `[${timeString}] ${item.name || '未知'}${sysTag}`;
+                nameTimeDiv.innerHTML = `[${timeString}] ${item.name || '未知'}${sysTag}${modelTag}`;
                 
                 const actionsDiv = document.createElement('div'); actionsDiv.className = 'msg-actions';
                 const btnEdit = document.createElement('button'); btnEdit.innerHTML = '✎'; btnEdit.title = '編輯';
