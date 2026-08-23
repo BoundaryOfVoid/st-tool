@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Google 登入與 Firebase 雲端同步模組 (SillyTavern 特化)</title>
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    
+    <!-- Firebase SDK (Compat Version 10.x for simple vanilla JS) -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+
+    <style>
+        :root {
+            --bg-color: #121214;
+            --card-bg: #1c1c21;
+            --text-color: #e4e4e7;
+            --meta-color: #a1a1aa;
+            --border-color: #27272a;
+            --accent-color: #6366f1;
+            --accent-hover: #4f46e5;
+            --success-color: #10b981;
+            --danger-color: #ef4444;
+            --warning-color: #f59e0b;
+            --input-bg: #27272a;
+            --btn-bg: #2e2e38;
+            --btn-hover: #3f3f4e;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 25px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .header h1 {
+            margin: 0 0 8px 0;
+            font-size: 1.7em;
+            color: #ffffff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .header p {
+            margin: 0;
+            color: var(--meta-color);
+            font-size: 0.95em;
+        }
+
+        .card {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        }
+
+        .card-title {
+            font-size: 1.15em;
+            font-weight: bold;
+            margin-top: 0;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            color: #ffffff;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 8px;
+        }
+
+        .badge {
+            font-size: 0.75em;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-weight: 500;
+        }
+        .badge-success { background-color: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid #059669; }
+        .badge-warning { background-color: rgba(245, 158, 11, 0.2); color: #fbbf24; border: 1px solid #d97706; }
+        .badge-danger { background-color: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid #dc2626; }
+
+        label {
+            display: block;
+            font-size: 0.9em;
+            font-weight: 600;
+            margin-bottom: 6px;
+            color: var(--meta-color);
+        }
+
+        input[type="text"], input[type="password"], textarea, select {
+            width: 100%;
+            background-color: var(--input-bg);
+            color: var(--text-color);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 10px 12px;
+            font-size: 0.95em;
+            box-sizing: border-box;
+            margin-bottom: 12px;
+            outline: none;
+            font-family: inherit;
+        }
+        input:focus, textarea:focus {
+            border-color: var(--accent-color);
+        }
+        textarea {
+            font-family: monospace;
+            resize: vertical;
+        }
+
+        .btn {
+            background-color: var(--btn-bg);
+            color: var(--text-color);
+            border: 1px solid var(--border-color);
+            padding: 9px 16px;
+            border-radius: 6px;
+            font-size: 0.95em;
+            font-weight: 600;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transition: all 0.2s;
+        }
+        .btn:hover { background-color: var(--btn-hover); }
+        .btn-primary { background-color: var(--accent-color); color: #ffffff; border-color: var(--accent-hover); }
+        .btn-primary:hover { background-color: var(--accent-hover); }
+        .btn-google { background-color: #ffffff; color: #1f2937; border-color: #e5e7eb; }
+        .btn-google:hover { background-color: #f3f4f6; }
+        .btn-danger { background-color: rgba(239, 68, 68, 0.2); color: #f87171; border-color: #dc2626; }
+        .btn-danger:hover { background-color: rgba(239, 68, 68, 0.3); }
+
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        /* 使用者資料卡 */
+        .user-profile {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 8px;
+            padding: 12px 15px;
+            margin-bottom: 15px;
+        }
+        .user-avatar {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            border: 2px solid var(--accent-color);
+            object-fit: cover;
+        }
+        .user-details {
+            flex-grow: 1;
+        }
+        .user-name {
+            font-size: 1.05em;
+            font-weight: bold;
+            color: #ffffff;
+            margin-bottom: 2px;
+        }
+        .user-email {
+            font-size: 0.85em;
+            color: var(--meta-color);
+        }
+        .user-uid {
+            font-size: 0.75em;
+            color: #71717a;
+            font-family: monospace;
+        }
+
+        /* 角色預設列表 */
+        .preset-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+            gap: 12px;
+            margin-top: 15px;
+        }
+        .preset-card {
+            background-color: var(--input-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 12px 14px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+        .preset-card-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 8px;
+        }
+        .char-name-badge {
+            font-weight: bold;
+            font-size: 1em;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .char-color-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+        .rules-count {
+            font-size: 0.8em;
+            color: var(--meta-color);
+        }
+        .preset-actions {
+            display: flex;
+            gap: 6px;
+            margin-top: 10px;
+        }
+        .preset-actions button {
+            flex: 1;
+            padding: 4px 8px;
+            font-size: 0.8em;
+        }
+
+        .alert-box {
+            background-color: rgba(99, 102, 241, 0.1);
+            border-left: 4px solid var(--accent-color);
+            padding: 10px 14px;
+            border-radius: 0 6px 6px 0;
+            font-size: 0.9em;
+            margin-bottom: 15px;
+        }
+
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+
+    <div class="header">
+        <h1><i class="fa-brands fa-google" style="color:#ea4335;"></i> Google 登入與 Firebase 雲端同步</h1>
+        <p>SillyTavern 角色專屬樣式與正則設定 — 純前端跨裝置同步展示模組</p>
+    </div>
+
+    <!-- 步驟 1: Firebase 專案設定 -->
+    <div class="card" id="configCard">
+        <div class="card-title">
+            <span><i class="fa-solid fa-sliders"></i> 1. Firebase 專案配置 (Client SDK)</span>
+            <span id="configStatusBadge" class="badge badge-warning">未連線</span>
+        </div>
+
+        <div class="alert-box">
+            💡 <strong>使用提示</strong>：請在下方貼上您從 <a href="https://console.firebase.google.com/" target="_blank" style="color:var(--accent-color);">Firebase Console</a> 取得的 <code>firebaseConfig</code> JSON 物件，設定會自動加密快取在您本機瀏覽器中。
+        </div>
+
+        <label for="configJsonInput">Firebase Config (JSON 格式或 JavaScript 物件)：</label>
+        <textarea id="configJsonInput" rows="7" placeholder='{
+  "apiKey": "AIzaSy...",
+  "authDomain": "your-app.firebaseapp.com",
+  "projectId": "your-app",
+  "storageBucket": "your-app.appspot.com",
+  "messagingSenderId": "...",
+  "appId": "..."
+}'></textarea>
+
+        <div class="btn-group">
+            <button id="btnInitFirebase" class="btn btn-primary"><i class="fa-solid fa-bolt"></i> 初始化 Firebase 連線</button>
+            <button id="btnClearConfig" class="btn btn-danger"><i class="fa-solid fa-trash"></i> 清除快取設定</button>
+        </div>
+    </div>
+
+    <!-- 步驟 2: Google 帳號身分驗證 -->
+    <div class="card" id="authCard">
+        <div class="card-title">
+            <span><i class="fa-solid fa-user-shield"></i> 2. Google 身分驗證 (Firebase Auth)</span>
+            <span id="authStatusBadge" class="badge badge-warning">未登入</span>
+        </div>
+
+        <!-- 尚未登入區塊 -->
+        <div id="loggedOutSection">
+            <p style="color:var(--meta-color); margin-top:0;">點擊下方按鈕以透過 Google 帳號安全登入。登入後即可存取屬於您帳號的專屬雲端空間：</p>
+            <button id="btnGoogleLogin" class="btn btn-google" disabled><i class="fa-brands fa-google" style="color:#ea4335;"></i> 使用 Google 帳號登入</button>
+        </div>
+
+        <!-- 已經登入區塊 -->
+        <div id="loggedInSection" class="hidden">
+            <div class="user-profile">
+                <img id="userAvatar" class="user-avatar" src="" alt="Avatar">
+                <div class="user-details">
+                    <div id="userName" class="user-name">Google 使用者</div>
+                    <div id="userEmail" class="user-email">user@example.com</div>
+                    <div id="userUid" class="user-uid">UID: -</div>
+                </div>
+                <button id="btnLogout" class="btn btn-danger"><i class="fa-solid fa-arrow-right-from-bracket"></i> 登出</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 步驟 3: 角色樣式與正則雲端 CRUD 同步展示 -->
+    <div class="card" id="syncCard">
+        <div class="card-title">
+            <span><i class="fa-solid fa-cloud-arrow-up"></i> 3. 角色專屬樣式與正則 (Firestore 雲端同步)</span>
+            <span id="syncStatusBadge" class="badge badge-warning">等待登入</span>
+        </div>
+
+        <div id="syncContentSection" class="hidden">
+            <div class="alert-box" style="border-left-color: var(--success-color); background: rgba(16, 185, 129, 0.08);">
+                ✅ 已成功連接至 Cloud Firestore 集合 <code>/users/{uid}/character_presets</code>。每位使用者的資料獨立儲存，安全隔離。
+            </div>
+
+            <!-- 新增/編輯角色面板 -->
+            <details style="background:var(--input-bg); border:1px solid var(--border-color); border-radius:6px; padding:12px; margin-bottom:15px;" open>
+                <summary style="font-weight:bold; cursor:pointer; color:#ffffff;">➕ 新增 / 編輯角色預設包</summary>
+                <div style="margin-top:12px;">
+                    <div style="display:flex; gap:10px;">
+                        <div style="flex:2;">
+                            <label>角色名稱 (對應對話中的 item.name)：</label>
+                            <input type="text" id="inputCharName" placeholder="例如：伏雷、蘭">
+                        </div>
+                        <div style="flex:1;">
+                            <label>主題色 (Hex)：</label>
+                            <input type="text" id="inputCharColor" placeholder="#4a90e2" value="#4a90e2">
+                        </div>
+                    </div>
+
+                    <label>角色專屬 CSS 樣式：</label>
+                    <textarea id="inputCharCss" rows="3" placeholder=".char-msg[data-name='伏雷'] { border-left-color: #4a90e2; }"></textarea>
+
+                    <label>正則規則清單 (JSON 格式)：</label>
+                    <textarea id="inputCharRules" rows="4" placeholder='[
+  {
+    "ruleName": "狀態欄",
+    "findRegex": "<status>([\\s\\S]*?)</status>",
+    "replaceString": "<details class=\"special-block\"><summary>📊 狀態</summary><div>$1</div></details>"
+  }
+]'></textarea>
+
+                    <div class="btn-group">
+                        <button id="btnSavePreset" class="btn btn-primary"><i class="fa-solid fa-floppy-disk"></i> 儲存至雲端 Firestore</button>
+                        <button id="btnResetForm" class="btn"><i class="fa-solid fa-rotate-left"></i> 清空重填</button>
+                    </div>
+                </div>
+            </details>
+
+            <!-- 雲端已有角色清單 -->
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:20px;">
+                <label style="margin:0; font-size:1em; color:#ffffff;">☁️ 目前雲端保存的角色設定清單：</label>
+                <button id="btnRefreshList" class="btn" style="padding:4px 10px; font-size:0.85em;"><i class="fa-solid fa-arrows-rotate"></i> 重新整理</button>
+            </div>
+
+            <div id="presetGrid" class="preset-grid">
+                <div style="color:var(--meta-color); font-size:0.9em;">載入中...</div>
+            </div>
+        </div>
+
+        <div id="syncLoginPrompt" style="text-align:center; padding:20px; color:var(--meta-color);">
+            <i class="fa-solid fa-lock" style="font-size:2em; margin-bottom:10px; display:block;"></i>
+            請先在上方完成 Google 帳號登入，以啟用雲端 Firestore 同步功能。
+        </div>
+    </div>
+
+</div>
+
+<script>
+    // ================= 狀態管理 =================
+    let firebaseApp = null;
+    let auth = null;
+    let db = null;
+    let currentUser = null;
+    let unsubscribeFirestore = null;
+
+    const STORAGE_KEY_CONFIG = 'st_firebase_config_v1';
+
+    // ================= 初始化載入 =================
+    document.addEventListener('DOMContentLoaded', () => {
+        const savedConfig = localStorage.getItem(STORAGE_KEY_CONFIG);
+        if (savedConfig) {
+            document.getElementById('configJsonInput').value = savedConfig;
+            tryInitFirebase(savedConfig);
+        }
+
+        // 綁定按鈕事件
+        document.getElementById('btnInitFirebase').addEventListener('click', () => {
+            const rawText = document.getElementById('configJsonInput').value.trim();
+            if (!rawText) return alert('請先輸入 Firebase 設定！');
+            tryInitFirebase(rawText);
+        });
+
+        document.getElementById('btnClearConfig').addEventListener('click', () => {
+            if (!confirm('確定要清除本機快取的 Firebase 設定嗎？')) return;
+            localStorage.removeItem(STORAGE_KEY_CONFIG);
+            document.getElementById('configJsonInput').value = '';
+            location.reload();
+        });
+
+        document.getElementById('btnGoogleLogin').addEventListener('click', handleGoogleLogin);
+        document.getElementById('btnLogout').addEventListener('click', handleLogout);
+        document.getElementById('btnSavePreset').addEventListener('click', handleSavePreset);
+        document.getElementById('btnResetForm').addEventListener('click', resetPresetForm);
+        document.getElementById('btnRefreshList').addEventListener('click', loadUserPresets);
+    });
+
+    // ================= Firebase 初始化 =================
+    function tryInitFirebase(configString) {
+        try {
+            let configObj;
+            // 寬鬆解析 JSON 或 JS 物件字串
+            if (configString.trim().startsWith('{')) {
+                configObj = JSON.parse(configString);
+            } else {
+                throw new Error('設定格式需為標準 JSON 格式');
+            }
+
+            if (!configObj.apiKey || !configObj.projectId) {
+                throw new Error('設定缺少 apiKey 或 projectId');
+            }
+
+            if (firebase.apps.length > 0) {
+                firebase.app().delete();
+            }
+
+            firebaseApp = firebase.initializeApp(configObj);
+            auth = firebase.auth();
+            db = firebase.firestore();
+
+            // 儲存於本機 LocalStorage
+            localStorage.setItem(STORAGE_KEY_CONFIG, JSON.stringify(configObj, null, 2));
+
+            // 更新 UI 狀態
+            const badge = document.getElementById('configStatusBadge');
+            badge.className = 'badge badge-success';
+            badge.textContent = `已連線 (${configObj.projectId})`;
+
+            document.getElementById('btnGoogleLogin').removeAttribute('disabled');
+
+            // 監聽 Auth 登入狀態變更
+            auth.onAuthStateChanged(user => {
+                currentUser = user;
+                updateAuthUI(user);
+                if (user) {
+                    subscribeUserPresets(user.uid);
+                } else {
+                    if (unsubscribeFirestore) unsubscribeFirestore();
+                }
+            });
+
+        } catch (err) {
+            console.error(err);
+            const badge = document.getElementById('configStatusBadge');
+            badge.className = 'badge badge-danger';
+            badge.textContent = '連線失敗';
+            alert(`Firebase 初始化失敗：${err.message}\n請確認輸入了正確的 JSON 格式設定。`);
+        }
+    }
+
+    // ================= Auth 登入/登出 =================
+    async function handleGoogleLogin() {
+        if (!auth) return alert('請先初始化 Firebase 設定！');
+        const provider = new firebase.auth.GoogleAuthProvider();
+        try {
+            await auth.signInWithPopup(provider);
+        } catch (error) {
+            console.error('Google 登入失敗:', error);
+            alert(`Google 登入失敗：${error.message}\n提示：請確認已在 Firebase Console 開啟 Google 登入提供者，並將當前網域加入授權清單。`);
+        }
+    }
+
+    async function handleLogout() {
+        if (!auth) return;
+        try {
+            await auth.signOut();
+        } catch (error) {
+            console.error('登出失敗:', error);
+        }
+    }
+
+    function updateAuthUI(user) {
+        const authBadge = document.getElementById('authStatusBadge');
+        const loggedInSec = document.getElementById('loggedInSection');
+        const loggedOutSec = document.getElementById('loggedOutSection');
+        const syncBadge = document.getElementById('syncStatusBadge');
+        const syncContent = document.getElementById('syncContentSection');
+        const syncPrompt = document.getElementById('syncLoginPrompt');
+
+        if (user) {
+            authBadge.className = 'badge badge-success';
+            authBadge.textContent = '已登入';
+            document.getElementById('userAvatar').src = user.photoURL || 'https://via.placeholder.com/50';
+            document.getElementById('userName').textContent = user.displayName || 'Google 使用者';
+            document.getElementById('userEmail').textContent = user.email || '';
+            document.getElementById('userUid').textContent = `UID: ${user.uid}`;
+
+            loggedInSec.classList.remove('hidden');
+            loggedOutSec.classList.add('hidden');
+
+            syncBadge.className = 'badge badge-success';
+            syncBadge.textContent = '即時同步中';
+            syncContent.classList.remove('hidden');
+            syncPrompt.classList.add('hidden');
+        } else {
+            authBadge.className = 'badge badge-warning';
+            authBadge.textContent = '未登入';
+            loggedInSec.classList.add('hidden');
+            loggedOutSec.classList.remove('hidden');
+
+            syncBadge.className = 'badge badge-warning';
+            syncBadge.textContent = '等待登入';
+            syncContent.classList.add('hidden');
+            syncPrompt.classList.remove('hidden');
+        }
+    }
+
+    // ================= Firestore 角色預設 CRUD =================
+    function subscribeUserPresets(uid) {
+        if (!db) return;
+        const colRef = db.collection('users').doc(uid).collection('character_presets');
+        
+        // 即時監聽變化 (Realtime Updates)
+        unsubscribeFirestore = colRef.onSnapshot(snapshot => {
+            const presets = [];
+            snapshot.forEach(doc => {
+                presets.push({ id: doc.id, ...doc.data() });
+            });
+            renderPresetGrid(presets);
+        }, error => {
+            console.error('Firestore 監聽失敗:', error);
+        });
+    }
+
+    async function loadUserPresets() {
+        if (!currentUser || !db) return;
+        try {
+            const colRef = db.collection('users').doc(currentUser.uid).collection('character_presets');
+            const snapshot = await colRef.get();
+            const presets = [];
+            snapshot.forEach(doc => presets.push({ id: doc.id, ...doc.data() }));
+            renderPresetGrid(presets);
+        } catch (err) {
+            console.error('載入失敗:', err);
+            alert('載入角色設定失敗：' + err.message);
+        }
+    }
+
+    async function handleSavePreset() {
+        if (!currentUser || !db) return alert('請先登入！');
+        const charName = document.getElementById('inputCharName').value.trim();
+        const themeColor = document.getElementById('inputCharColor').value.trim() || '#4a90e2';
+        const customCss = document.getElementById('inputCharCss').value.trim();
+        const rawRules = document.getElementById('inputCharRules').value.trim();
+
+        if (!charName) return alert('請填寫角色名稱！');
+
+        let parsedRules = [];
+        if (rawRules) {
+            try {
+                parsedRules = JSON.parse(rawRules);
+                if (!Array.isArray(parsedRules)) throw new Error('規則需為陣列格式 [ ... ]');
+            } catch (e) {
+                return alert('正則規則 JSON 格式有誤：' + e.message);
+            }
+        }
+
+        const presetData = {
+            charName: charName,
+            themeColor: themeColor,
+            customCss: customCss,
+            rules: parsedRules,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        };
+
+        try {
+            const docRef = db.collection('users').doc(currentUser.uid).collection('character_presets').doc(charName);
+            await docRef.set(presetData, { merge: true });
+            alert(`角色「${charName}」設定已成功儲存至 Firestore 雲端！`);
+            resetPresetForm();
+        } catch (err) {
+            console.error('儲存失敗:', err);
+            alert('儲存至雲端失敗：' + err.message);
+        }
+    }
+
+    async function deletePreset(charName) {
+        if (!confirm(`確定要刪除雲端角色「${charName}」的設定嗎？`)) return;
+        try {
+            await db.collection('users').doc(currentUser.uid).collection('character_presets').doc(charName).delete();
+            alert(`已刪除「${charName}」`);
+        } catch (err) {
+            alert('刪除失敗：' + err.message);
+        }
+    }
+
+    function editPreset(preset) {
+        document.getElementById('inputCharName').value = preset.charName || preset.id;
+        document.getElementById('inputCharColor').value = preset.themeColor || '#4a90e2';
+        document.getElementById('inputCharCss').value = preset.customCss || '';
+        document.getElementById('inputCharRules').value = JSON.stringify(preset.rules || [], null, 2);
+        window.scrollTo({ top: document.getElementById('syncCard').offsetTop - 30, behavior: 'smooth' });
+    }
+
+    function resetPresetForm() {
+        document.getElementById('inputCharName').value = '';
+        document.getElementById('inputCharColor').value = '#4a90e2';
+        document.getElementById('inputCharCss').value = '';
+        document.getElementById('inputCharRules').value = '';
+    }
+
+    function renderPresetGrid(presets) {
+        const grid = document.getElementById('presetGrid');
+        grid.innerHTML = '';
+
+        if (!presets || presets.length === 0) {
+            grid.innerHTML = '<div style="color:var(--meta-color); font-size:0.9em; grid-column: 1/-1;">尚無任何角色設定。請在上方表單新增一個角色！</div>';
+            return;
+        }
+
+        presets.forEach(p => {
+            const card = document.createElement('div');
+            card.className = 'preset-card';
+
+            const ruleCount = Array.isArray(p.rules) ? p.rules.length : 0;
+            const color = p.themeColor || '#6366f1';
+
+            card.innerHTML = `
+                <div>
+                    <div class="preset-card-header">
+                        <div class="char-name-badge">
+                            <span class="char-color-dot" style="background-color: ${color};"></span>
+                            <span>${p.charName || p.id}</span>
+                        </div>
+                        <span class="rules-count">${ruleCount} 條正則</span>
+                    </div>
+                    <div style="font-size:0.8em; color:var(--meta-color); max-height:40px; overflow:hidden; text-overflow:ellipsis;">
+                        ${p.customCss ? '🎨 含自訂 CSS' : '無自訂 CSS'}
+                    </div>
+                </div>
+                <div class="preset-actions">
+                    <button class="btn btn-primary btn-edit"><i class="fa-solid fa-pen"></i> 編輯</button>
+                    <button class="btn btn-danger btn-del"><i class="fa-solid fa-trash"></i> 刪除</button>
+                </div>
+            `;
+
+            card.querySelector('.btn-edit').onclick = () => editPreset(p);
+            card.querySelector('.btn-del').onclick = () => deletePreset(p.charName || p.id);
+
+            grid.appendChild(card);
+        });
+    }
+</script>
+
+</body>
+</html>
