@@ -9,6 +9,7 @@
     
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
     
     <style>
         /* ================= 系統基礎變數 ================= */
@@ -349,6 +350,30 @@
                     <button id="btnExportPreset">📤 匯出</button>
                 </div>
                 <input type="file" id="regexFileInput" accept=".json" style="display: none;">
+            </div>
+
+            <!-- Google Drive 雲端同步面板 -->
+            <div class="nav-section">
+                <label style="display:flex; align-items:center; gap:6px;"><i class="fa-brands fa-google-drive" style="color:#0f9d58;"></i> Google Drive 雲端同步</label>
+                <div id="gdriveLoggedOut">
+                    <button id="btnGDriveConnect" style="background:#0f9d58; color:#ffffff; font-weight:bold; margin-bottom:4px;"><i class="fa-brands fa-google-drive"></i> 連線 Google 雲端硬碟</button>
+                </div>
+                <div id="gdriveLoggedIn" style="display:none;">
+                    <div style="font-size:0.85em; color:var(--text-color); display:flex; align-items:center; gap:8px; margin-bottom:6px; background:rgba(255,255,255,0.05); padding:4px 8px; border-radius:4px;">
+                        <img id="gdriveUserAvatar" src="" style="width:22px; height:22px; border-radius:50%; display:none;">
+                        <span id="gdriveUserName" style="font-weight:bold; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex-grow:1;">已連線雲端硬碟</span>
+                        <button id="btnGDriveLogout" style="width:auto; padding:2px 6px; font-size:0.75em; margin:0; background:#dc3545; color:#fff;" title="中斷連線">登出</button>
+                    </div>
+                    <div class="btn-group" style="margin-top: 2px;">
+                        <button id="btnGDriveFetch" class="btn-cloud-action" title="從 Google Drive 下載最新預設包"><i class="fa-solid fa-cloud-arrow-down"></i> 下載 (Fetch)</button>
+                        <button id="btnGDrivePush" class="btn-cloud-action" title="將本地預設包上傳至 Google Drive"><i class="fa-solid fa-cloud-arrow-up"></i> 上傳 (Push)</button>
+                    </div>
+                </div>
+                <details style="margin-top:5px; font-size:0.8em; color:var(--meta-color);">
+                    <summary style="cursor:pointer;">⚙️ Client ID 設定 (可選)</summary>
+                    <input type="text" id="gdriveClientIdInput" placeholder="Google OAuth Client ID" style="margin-top:4px; font-size:0.85em; padding:4px;">
+                    <button id="btnSaveGDriveClientId" style="font-size:0.8em; padding:3px; background:var(--btn-hover); margin-bottom:0;">儲存 Client ID</button>
+                </details>
             </div>
 
             <!-- GitHub Gist 雲端儲存面板 -->
@@ -729,6 +754,196 @@
                     refreshPresetDropdown(); alert('下載成功！'); if (globalParsedData.length) renderOutput();
                 } catch (err) { alert(`下載失敗`); }
             });
+
+            // ================= Google Drive 雲端同步 =================
+            const DEFAULT_GOOGLE_CLIENT_ID = ""; // 您也可以直接在此填入您的 Client ID
+            const GDRIVE_STORAGE_KEY_CLIENT_ID = 'st_gdrive_client_id_v1';
+            const GDRIVE_FILE_NAME = 'st_character_presets.json';
+            const GDRIVE_SCOPES = 'https://www.googleapis.com/auth/drive.appdata https://www.googleapis.com/auth/userinfo.profile';
+
+            let gdriveTokenClient = null;
+            let gdriveAccessToken = null;
+            let gdriveFileId = null;
+
+            function getEffectiveGDriveClientId() {
+                return DEFAULT_GOOGLE_CLIENT_ID || localStorage.getItem(GDRIVE_STORAGE_KEY_CLIENT_ID) || '';
+            }
+
+            function initGDriveGIS() {
+                const clientId = getEffectiveGDriveClientId();
+                if (!clientId) return;
+                document.getElementById('gdriveClientIdInput').value = clientId;
+
+                if (typeof google === 'undefined' || !google.accounts) {
+                    setTimeout(initGDriveGIS, 300);
+                    return;
+                }
+
+                try {
+                    gdriveTokenClient = google.accounts.oauth2.initTokenClient({
+                        client_id: clientId,
+                        scope: GDRIVE_SCOPES,
+                        callback: handleGDriveTokenResponse
+                    });
+                } catch(e) {
+                    console.error('GIS Init error:', e);
+                }
+            }
+
+            document.getElementById('btnSaveGDriveClientId').addEventListener('click', () => {
+                const val = document.getElementById('gdriveClientIdInput').value.trim();
+                if (!val) return alert('請輸入 Client ID！');
+                localStorage.setItem(GDRIVE_STORAGE_KEY_CLIENT_ID, val);
+                initGDriveGIS();
+                alert('Client ID 已儲存！');
+            });
+
+            document.getElementById('btnGDriveConnect').addEventListener('click', () => {
+                const clientId = getEffectiveGDriveClientId();
+                if (!clientId) {
+                    return alert('尚未設定 Google OAuth Client ID！\n請展開下方的「⚙️ Client ID 設定」貼上您的 Client ID。');
+                }
+                if (!gdriveTokenClient) initGDriveGIS();
+                if (gdriveTokenClient) {
+                    gdriveTokenClient.requestAccessToken({ prompt: 'consent' });
+                } else {
+                    alert('Google Identity 服務載入中，請稍候再試。');
+                }
+            });
+
+            document.getElementById('btnGDriveLogout').addEventListener('click', () => {
+                if (gdriveAccessToken && typeof google !== 'undefined' && google.accounts) {
+                    google.accounts.oauth2.revoke(gdriveAccessToken, () => {
+                        gdriveAccessToken = null;
+                        gdriveFileId = null;
+                        updateGDriveUI(false);
+                    });
+                } else {
+                    gdriveAccessToken = null;
+                    gdriveFileId = null;
+                    updateGDriveUI(false);
+                }
+            });
+
+            async function handleGDriveTokenResponse(resp) {
+                if (resp.error) return alert('Google 授權失敗：' + resp.error);
+                gdriveAccessToken = resp.access_token;
+                updateGDriveUI(true);
+
+                // 讀取使用者基本資料
+                try {
+                    const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+                        headers: { 'Authorization': `Bearer ${gdriveAccessToken}` }
+                    });
+                    if (res.ok) {
+                        const user = await res.json();
+                        if (user.picture) {
+                            const img = document.getElementById('gdriveUserAvatar');
+                            img.src = user.picture;
+                            img.style.display = 'inline-block';
+                        }
+                        if (user.name) {
+                            document.getElementById('gdriveUserName').textContent = user.name;
+                        }
+                    }
+                } catch(e){}
+
+                // 自動查詢雲端檔案
+                await findGDriveFile();
+            }
+
+            function updateGDriveUI(isAuthed) {
+                document.getElementById('gdriveLoggedOut').style.display = isAuthed ? 'none' : 'block';
+                document.getElementById('gdriveLoggedIn').style.display = isAuthed ? 'block' : 'none';
+            }
+
+            async function findGDriveFile() {
+                if (!gdriveAccessToken) return;
+                try {
+                    const q = encodeURIComponent(`name = '${GDRIVE_FILE_NAME}' and trashed = false`);
+                    const res = await fetch(`https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=${q}&fields=files(id,name,modifiedTime)`, {
+                        headers: { 'Authorization': `Bearer ${gdriveAccessToken}` }
+                    });
+                    if (res.ok) {
+                        const data = await res.json();
+                        if (data.files && data.files.length > 0) {
+                            gdriveFileId = data.files[0].id;
+                        } else {
+                            gdriveFileId = null;
+                        }
+                    }
+                } catch(e) {
+                    console.error('查詢 Drive 檔案失敗:', e);
+                }
+            }
+
+            document.getElementById('btnGDriveFetch').addEventListener('click', async () => {
+                if (!gdriveAccessToken) return alert('請先連線 Google 雲端硬碟！');
+                await findGDriveFile();
+                if (!gdriveFileId) return alert('Google 雲端硬碟中尚未有備份檔案！請先點擊「上傳」建立雲端檔案。');
+
+                try {
+                    const res = await fetch(`https://www.googleapis.com/drive/v3/files/${gdriveFileId}?alt=media`, {
+                        headers: { 'Authorization': `Bearer ${gdriveAccessToken}` }
+                    });
+                    if (!res.ok) throw new Error(await res.text());
+                    const cloudPresets = await res.json();
+                    customPresets = cloudPresets;
+                    savePresets();
+                    refreshPresetDropdown();
+                    if (globalParsedData.length) renderOutput();
+                    alert('🎉 成功從您的 Google Drive 載入最新預設包！');
+                } catch(err) {
+                    console.error(err);
+                    alert('下載失敗：' + err.message);
+                }
+            });
+
+            document.getElementById('btnGDrivePush').addEventListener('click', async () => {
+                if (!gdriveAccessToken) return alert('請先連線 Google 雲端硬碟！');
+                const contentString = JSON.stringify(customPresets, null, 2);
+
+                try {
+                    await findGDriveFile();
+                    if (gdriveFileId) {
+                        // 更新既有檔案
+                        const res = await fetch(`https://www.googleapis.com/upload/drive/v3/files/${gdriveFileId}?uploadType=media`, {
+                            method: 'PATCH',
+                            headers: {
+                                'Authorization': `Bearer ${gdriveAccessToken}`,
+                                'Content-Type': 'application/json'
+                            },
+                            body: contentString
+                        });
+                        if (!res.ok) throw new Error(await res.text());
+                    } else {
+                        // 建立新檔案於 appDataFolder
+                        const metadata = { name: GDRIVE_FILE_NAME, parents: ['appDataFolder'] };
+                        const boundary = '-------314159265358979323846';
+                        const delimiter = "\r\n--" + boundary + "\r\n";
+                        const close_delim = "\r\n--" + boundary + "--";
+                        const multipartBody = delimiter + 'Content-Type: application/json; charset=UTF-8\r\n\r\n' + JSON.stringify(metadata) + delimiter + 'Content-Type: application/json\r\n\r\n' + contentString + close_delim;
+
+                        const res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+                            method: 'POST',
+                            headers: {
+                                'Authorization': `Bearer ${gdriveAccessToken}`,
+                                'Content-Type': `multipart/related; boundary=${boundary}`
+                            },
+                            body: multipartBody
+                        });
+                        if (!res.ok) throw new Error(await res.text());
+                        const data = await res.json();
+                        gdriveFileId = data.id;
+                    }
+                    alert('✅ 預設包已成功上傳並保存至您的個人 Google Drive 專屬空間！');
+                } catch(err) {
+                    console.error(err);
+                    alert('上傳失敗：' + err.message);
+                }
+            });
+
+            initGDriveGIS();
 
             // 依螢幕寬度初始化側邊面板 (電腦版預設展開，手機版預設收合)
             const floatingPanel = document.getElementById('floatingPanel');
