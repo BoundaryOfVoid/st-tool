@@ -377,6 +377,7 @@
 
 <script>
     // ================= 狀態管理 =================
+    const DEFAULT_CLIENT_ID = "15417722990-5j3m65biqhtf999f9ll7mvdd8dhhi3ee.apps.googleusercontent.com";
     const STORAGE_KEY_CLIENT_ID = 'st_gdrive_client_id_v1';
     const STORAGE_KEY_LOCAL_PRESETS = 'st_gdrive_local_presets_v1';
     const GDRIVE_FILE_NAME = 'st_character_presets.json';
@@ -389,11 +390,11 @@
 
     // ================= 初始化載入 =================
     document.addEventListener('DOMContentLoaded', () => {
-        // 載入快取的 Client ID
-        const savedClientId = localStorage.getItem(STORAGE_KEY_CLIENT_ID);
-        if (savedClientId) {
-            document.getElementById('clientIdInput').value = savedClientId;
-            initGoogleClient(savedClientId);
+        // 載入 Client ID (優先使用預設常數)
+        const activeClientId = DEFAULT_CLIENT_ID || localStorage.getItem(STORAGE_KEY_CLIENT_ID);
+        if (activeClientId) {
+            document.getElementById('clientIdInput').value = activeClientId;
+            initGoogleClient(activeClientId);
         }
 
         // 載入本地角色資料

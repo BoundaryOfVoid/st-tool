@@ -369,11 +369,6 @@
                         <button id="btnGDrivePush" class="btn-cloud-action" title="將本地預設包上傳至 Google Drive"><i class="fa-solid fa-cloud-arrow-up"></i> 上傳 (Push)</button>
                     </div>
                 </div>
-                <details style="margin-top:5px; font-size:0.8em; color:var(--meta-color);">
-                    <summary style="cursor:pointer;">⚙️ Client ID 設定 (可選)</summary>
-                    <input type="text" id="gdriveClientIdInput" placeholder="Google OAuth Client ID" style="margin-top:4px; font-size:0.85em; padding:4px;">
-                    <button id="btnSaveGDriveClientId" style="font-size:0.8em; padding:3px; background:var(--btn-hover); margin-bottom:0;">儲存 Client ID</button>
-                </details>
             </div>
 
             <!-- GitHub Gist 雲端儲存面板 -->
@@ -756,8 +751,7 @@
             });
 
             // ================= Google Drive 雲端同步 =================
-            const DEFAULT_GOOGLE_CLIENT_ID = ""; // 您也可以直接在此填入您的 Client ID
-            const GDRIVE_STORAGE_KEY_CLIENT_ID = 'st_gdrive_client_id_v1';
+            const GOOGLE_CLIENT_ID = "15417722990-5j3m65biqhtf999f9ll7mvdd8dhhi3ee.apps.googleusercontent.com";
             const GDRIVE_FILE_NAME = 'st_character_presets.json';
             const GDRIVE_SCOPES = 'https://www.googleapis.com/auth/drive.appdata https://www.googleapis.com/auth/userinfo.profile';
 
@@ -765,15 +759,7 @@
             let gdriveAccessToken = null;
             let gdriveFileId = null;
 
-            function getEffectiveGDriveClientId() {
-                return DEFAULT_GOOGLE_CLIENT_ID || localStorage.getItem(GDRIVE_STORAGE_KEY_CLIENT_ID) || '';
-            }
-
             function initGDriveGIS() {
-                const clientId = getEffectiveGDriveClientId();
-                if (!clientId) return;
-                document.getElementById('gdriveClientIdInput').value = clientId;
-
                 if (typeof google === 'undefined' || !google.accounts) {
                     setTimeout(initGDriveGIS, 300);
                     return;
@@ -781,7 +767,7 @@
 
                 try {
                     gdriveTokenClient = google.accounts.oauth2.initTokenClient({
-                        client_id: clientId,
+                        client_id: GOOGLE_CLIENT_ID,
                         scope: GDRIVE_SCOPES,
                         callback: handleGDriveTokenResponse
                     });
@@ -790,19 +776,7 @@
                 }
             }
 
-            document.getElementById('btnSaveGDriveClientId').addEventListener('click', () => {
-                const val = document.getElementById('gdriveClientIdInput').value.trim();
-                if (!val) return alert('請輸入 Client ID！');
-                localStorage.setItem(GDRIVE_STORAGE_KEY_CLIENT_ID, val);
-                initGDriveGIS();
-                alert('Client ID 已儲存！');
-            });
-
             document.getElementById('btnGDriveConnect').addEventListener('click', () => {
-                const clientId = getEffectiveGDriveClientId();
-                if (!clientId) {
-                    return alert('尚未設定 Google OAuth Client ID！\n請展開下方的「⚙️ Client ID 設定」貼上您的 Client ID。');
-                }
                 if (!gdriveTokenClient) initGDriveGIS();
                 if (gdriveTokenClient) {
                     gdriveTokenClient.requestAccessToken({ prompt: 'consent' });
