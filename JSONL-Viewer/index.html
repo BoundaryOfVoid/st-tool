@@ -350,17 +350,14 @@
                     <button id="btnExportPreset">📤 匯出</button>
                 </div>
                 <input type="file" id="regexFileInput" accept=".json" style="display: none;">
-            </div>
 
-            <!-- Google Drive 雲端同步面板 -->
-            <div class="nav-section">
-                <label style="display:flex; align-items:center; gap:6px;"><i class="fa-brands fa-google-drive" style="color:#0f9d58;"></i> Google Drive 雲端同步</label>
-                <div id="gdriveLoggedOut">
-                    <button id="btnGDriveConnect" style="background:#0f9d58; color:#ffffff; font-weight:bold; margin-bottom:4px;"><i class="fa-brands fa-google-drive"></i> 連線 Google 雲端硬碟</button>
+                <!-- Google Drive 雲端同步按鈕 -->
+                <div id="gdriveLoggedOut" style="margin-top: 8px;">
+                    <button id="btnGDriveConnect" style="background:#0f9d58; color:#ffffff; font-weight:bold; width:100%;"><i class="fa-brands fa-google-drive"></i> 連線 Google 雲端硬碟</button>
                 </div>
-                <div id="gdriveLoggedIn" style="display:none;">
+                <div id="gdriveLoggedIn" style="display:none; margin-top: 8px;">
                     <div style="font-size:0.85em; color:var(--text-color); display:flex; align-items:center; gap:8px; margin-bottom:6px; background:rgba(255,255,255,0.05); padding:4px 8px; border-radius:4px;">
-                        <img id="gdriveUserAvatar" src="" style="width:22px; height:22px; border-radius:50%; display:none;">
+                        <img id="gdriveUserAvatar" src="" style="width:20px; height:20px; border-radius:50%; display:none;">
                         <span id="gdriveUserName" style="font-weight:bold; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex-grow:1;">已連線雲端硬碟</span>
                         <button id="btnGDriveLogout" style="width:auto; padding:2px 6px; font-size:0.75em; margin:0; background:#dc3545; color:#fff;" title="中斷連線">登出</button>
                     </div>
@@ -368,18 +365,6 @@
                         <button id="btnGDriveFetch" class="btn-cloud-action" title="從 Google Drive 下載最新預設包"><i class="fa-solid fa-cloud-arrow-down"></i> 下載 (Fetch)</button>
                         <button id="btnGDrivePush" class="btn-cloud-action" title="將本地預設包上傳至 Google Drive"><i class="fa-solid fa-cloud-arrow-up"></i> 上傳 (Push)</button>
                     </div>
-                </div>
-            </div>
-
-            <!-- GitHub Gist 雲端儲存面板 -->
-            <div class="nav-section">
-                <label>🌐 GitHub Gist 雲端同步</label>
-                <input type="password" id="ghToken" placeholder="GitHub PAT (Token)">
-                <input type="text" id="ghGistId" placeholder="Gist ID (選填)">
-                <div class="btn-group" style="margin-top: 3px;">
-                    <button id="btnCloudFetch" class="btn-cloud-action" title="從雲端抓取覆蓋本地">🔄 抓取</button>
-                    <button id="btnCloudPush" class="btn-cloud-action" title="將本地上傳覆蓋雲端">💾 上傳</button>
-                    <button id="btnCloudCreate" class="btn-cloud-action" title="在帳號下自動建立全新密密Gist">🆕 建立</button>
                 </div>
             </div>
 
@@ -708,47 +693,6 @@
             });
 
             document.getElementById('presetSelect').addEventListener('change', () => { renderRulesListUI(); if (globalParsedData.length) renderOutput(); });
-
-            // 雲端備份
-            document.getElementById('ghToken').value = localStorage.getItem('st_gh_token') || '';
-            document.getElementById('ghGistId').value = localStorage.getItem('st_gh_gist_id') || '';
-
-            document.getElementById('btnCloudCreate').addEventListener('click', async () => {
-                const token = document.getElementById('ghToken').value.trim(); if (!token) return alert('請輸入 GitHub Token！');
-                try {
-                    const response = await fetch('https://api.github.com/gists', {
-                        method: 'POST',
-                        headers: { "Authorization": `Bearer ${token}`, "Accept": "application/vnd.github.v3+json", "Content-Type": "application/json" },
-                        body: JSON.stringify({ description: "SillyTavern Viewer Custom Regex Presets Backup", public: false, files: { "st_v2_presets.json": { content: JSON.stringify(customPresets, null, 2) } } })
-                    });
-                    if (!response.ok) throw new Error(); const result = await response.json();
-                    document.getElementById('ghGistId').value = result.id; localStorage.setItem('st_gh_token', token); localStorage.setItem('st_gh_gist_id', result.id);
-                    alert(`祕密 Gist 建立成功！`);
-                } catch (err) { alert(`建立雲端空間失敗。`); }
-            });
-
-            document.getElementById('btnCloudPush').addEventListener('click', async () => {
-                const token = document.getElementById('ghToken').value.trim(); const gistId = document.getElementById('ghGistId').value.trim();
-                if (!token || !gistId) return alert('請填寫 Token 與 Gist ID！');
-                try {
-                    const response = await fetch(`https://api.github.com/gists/${gistId}`, {
-                        method: 'PATCH', headers: { "Authorization": `Bearer ${token}`, "Accept": "application/vnd.github.v3+json", "Content-Type": "application/json" },
-                        body: JSON.stringify({ files: { "st_v2_presets.json": { content: JSON.stringify(customPresets, null, 2) } } })
-                    });
-                    if (!response.ok) throw new Error(); localStorage.setItem('st_gh_token', token); localStorage.setItem('st_gh_gist_id', gistId); alert('上傳成功！');
-                } catch (err) { alert(`同步失敗`); }
-            });
-
-            document.getElementById('btnCloudFetch').addEventListener('click', async () => {
-                const token = document.getElementById('ghToken').value.trim(); const gistId = document.getElementById('ghGistId').value.trim();
-                if (!token || !gistId) return alert('請填寫 Token 與 Gist ID！');
-                try {
-                    const response = await fetch(`https://api.github.com/gists/${gistId}`, { headers: { "Authorization": `Bearer ${token}`, "Accept": "application/vnd.github.v3+json" } });
-                    if (!response.ok) throw new Error(); const result = await response.json();
-                    customPresets = JSON.parse(result.files["st_v2_presets.json"].content); savePresets(); localStorage.setItem('st_gh_token', token); localStorage.setItem('st_gh_gist_id', gistId);
-                    refreshPresetDropdown(); alert('下載成功！'); if (globalParsedData.length) renderOutput();
-                } catch (err) { alert(`下載失敗`); }
-            });
 
             // ================= Google Drive 雲端同步 =================
             const GOOGLE_CLIENT_ID = "15417722990-5j3m65biqhtf999f9ll7mvdd8dhhi3ee.apps.googleusercontent.com";
