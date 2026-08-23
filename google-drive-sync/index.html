@@ -1,0 +1,747 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Google Drive 雲端硬碟同步模組 (SillyTavern 特化)</title>
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    
+    <!-- Google Identity Services (GIS) 最新官方庫 -->
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+
+    <style>
+        :root {
+            --bg-color: #121214;
+            --card-bg: #1c1c21;
+            --text-color: #e4e4e7;
+            --meta-color: #a1a1aa;
+            --border-color: #27272a;
+            --accent-color: #3b82f6;
+            --accent-hover: #2563eb;
+            --drive-color: #0f9d58;
+            --drive-hover: #0b8043;
+            --success-color: #10b981;
+            --danger-color: #ef4444;
+            --warning-color: #f59e0b;
+            --input-bg: #27272a;
+            --btn-bg: #2e2e38;
+            --btn-hover: #3f3f4e;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 25px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .header h1 {
+            margin: 0 0 8px 0;
+            font-size: 1.7em;
+            color: #ffffff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+        }
+
+        .header p {
+            margin: 0;
+            color: var(--meta-color);
+            font-size: 0.95em;
+        }
+
+        .card {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        }
+
+        .card-title {
+            font-size: 1.15em;
+            font-weight: bold;
+            margin-top: 0;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            color: #ffffff;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 8px;
+        }
+
+        .badge {
+            font-size: 0.75em;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-weight: 500;
+        }
+        .badge-success { background-color: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid #059669; }
+        .badge-warning { background-color: rgba(245, 158, 11, 0.2); color: #fbbf24; border: 1px solid #d97706; }
+        .badge-danger { background-color: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid #dc2626; }
+
+        label {
+            display: block;
+            font-size: 0.9em;
+            font-weight: 600;
+            margin-bottom: 6px;
+            color: var(--meta-color);
+        }
+
+        input[type="text"], input[type="password"], textarea, select {
+            width: 100%;
+            background-color: var(--input-bg);
+            color: var(--text-color);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 10px 12px;
+            font-size: 0.95em;
+            box-sizing: border-box;
+            margin-bottom: 12px;
+            outline: none;
+            font-family: inherit;
+        }
+        input:focus, textarea:focus {
+            border-color: var(--accent-color);
+        }
+        textarea {
+            font-family: monospace;
+            resize: vertical;
+        }
+
+        .btn {
+            background-color: var(--btn-bg);
+            color: var(--text-color);
+            border: 1px solid var(--border-color);
+            padding: 9px 16px;
+            border-radius: 6px;
+            font-size: 0.95em;
+            font-weight: 600;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transition: all 0.2s;
+        }
+        .btn:hover { background-color: var(--btn-hover); }
+        .btn-primary { background-color: var(--accent-color); color: #ffffff; border-color: var(--accent-hover); }
+        .btn-primary:hover { background-color: var(--accent-hover); }
+        .btn-drive { background-color: var(--drive-color); color: #ffffff; border-color: var(--drive-hover); }
+        .btn-drive:hover { background-color: var(--drive-hover); }
+        .btn-google { background-color: #ffffff; color: #1f2937; border-color: #e5e7eb; }
+        .btn-google:hover { background-color: #f3f4f6; }
+        .btn-danger { background-color: rgba(239, 68, 68, 0.2); color: #f87171; border-color: #dc2626; }
+        .btn-danger:hover { background-color: rgba(239, 68, 68, 0.3); }
+
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        /* 使用者資料卡 */
+        .user-profile {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 8px;
+            padding: 12px 15px;
+            margin-bottom: 15px;
+        }
+        .user-avatar {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            border: 2px solid var(--drive-color);
+            object-fit: cover;
+        }
+        .user-details {
+            flex-grow: 1;
+        }
+        .user-name {
+            font-size: 1.05em;
+            font-weight: bold;
+            color: #ffffff;
+            margin-bottom: 2px;
+        }
+        .user-email {
+            font-size: 0.85em;
+            color: var(--meta-color);
+        }
+
+        /* 角色預設列表 */
+        .preset-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+            gap: 12px;
+            margin-top: 15px;
+        }
+        .preset-card {
+            background-color: var(--input-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 12px 14px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+        .preset-card-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 8px;
+        }
+        .char-name-badge {
+            font-weight: bold;
+            font-size: 1em;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .char-color-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+        .rules-count {
+            font-size: 0.8em;
+            color: var(--meta-color);
+        }
+        .preset-actions {
+            display: flex;
+            gap: 6px;
+            margin-top: 10px;
+        }
+        .preset-actions button {
+            flex: 1;
+            padding: 4px 8px;
+            font-size: 0.8em;
+        }
+
+        .alert-box {
+            background-color: rgba(59, 130, 246, 0.1);
+            border-left: 4px solid var(--accent-color);
+            padding: 10px 14px;
+            border-radius: 0 6px 6px 0;
+            font-size: 0.9em;
+            margin-bottom: 15px;
+        }
+
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+
+    <div class="header">
+        <h1><i class="fa-brands fa-google-drive" style="color:#0f9d58;"></i> Google Drive 雲端硬碟同步模組</h1>
+        <p>SillyTavern 角色專屬樣式與正則設定 — 零後端代管・100% 存放於使用者個人 Google 空間</p>
+    </div>
+
+    <!-- 步驟 1: Google Cloud Client ID 設定 -->
+    <div class="card" id="configCard">
+        <div class="card-title">
+            <span><i class="fa-solid fa-key"></i> 1. Google OAuth Client ID 設定</span>
+            <span id="configStatusBadge" class="badge badge-warning">未設定 Client ID</span>
+        </div>
+
+        <div class="alert-box">
+            💡 <strong>100% 零後端代管保證</strong>：
+            本工具透過 Google 官方 <code>drive.appdata</code> 授權，直接將角色設定檔存放在<strong>您個人的 Google 雲端硬碟隱藏應用程式空間</strong>中。網站作者與任何第三方完全無法存取或查看您的任何檔案！
+        </div>
+
+        <label for="clientIdInput">Google OAuth Client ID：</label>
+        <input type="text" id="clientIdInput" placeholder="例如：1234567890-abcdefghijklmnopqrstuvwxyz.apps.googleusercontent.com">
+
+        <div class="btn-group">
+            <button id="btnSaveClientId" class="btn btn-primary"><i class="fa-solid fa-check"></i> 儲存並啟用連線</button>
+            <button id="btnClearClientId" class="btn btn-danger"><i class="fa-solid fa-trash"></i> 清除快取</button>
+        </div>
+    </div>
+
+    <!-- 步驟 2: Google 帳號授權 -->
+    <div class="card" id="authCard">
+        <div class="card-title">
+            <span><i class="fa-solid fa-user-check"></i> 2. Google 雲端硬碟授權 (Google Drive Access)</span>
+            <span id="authStatusBadge" class="badge badge-warning">未授權</span>
+        </div>
+
+        <!-- 尚未登入授權 -->
+        <div id="loggedOutSection">
+            <p style="color:var(--meta-color); margin-top:0;">點擊下方按鈕以透過 Google 官方視窗授權存取您專屬的 Google Drive 應用程式儲存區：</p>
+            <button id="btnAuthDrive" class="btn btn-drive" disabled><i class="fa-brands fa-google-drive"></i> 授權連線 Google 雲端硬碟</button>
+        </div>
+
+        <!-- 已授權 -->
+        <div id="loggedInSection" class="hidden">
+            <div class="user-profile">
+                <img id="userAvatar" class="user-avatar" src="https://via.placeholder.com/48" alt="Avatar">
+                <div class="user-details">
+                    <div id="userName" class="user-name">Google 雲端硬碟已連線</div>
+                    <div id="userEmail" class="user-email">已授權 drive.appdata 專屬空間</div>
+                    <div id="driveFileInfo" style="font-size:0.75em; color:var(--success-color); font-family:monospace; margin-top:2px;">雲端檔案：搜尋中...</div>
+                </div>
+                <button id="btnRevokeAuth" class="btn btn-danger"><i class="fa-solid fa-arrow-right-from-bracket"></i> 中斷連線</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 步驟 3: 角色樣式與正則雲端硬碟 CRUD -->
+    <div class="card" id="syncCard">
+        <div class="card-title">
+            <span><i class="fa-solid fa-boxes-stacked"></i> 3. 角色專屬樣式與正則管理 (Google Drive 同步)</span>
+            <span id="syncStatusBadge" class="badge badge-warning">等待授權</span>
+        </div>
+
+        <div id="syncContentSection" class="hidden">
+            <div class="alert-box" style="border-left-color: var(--drive-color); background: rgba(15, 157, 88, 0.08);">
+                📁 <strong>雲端硬碟狀態</strong>：已成功連線至個人 Google Drive 專屬檔案 <code>st_character_presets.json</code>。
+            </div>
+
+            <!-- 同步操作列 -->
+            <div class="btn-group" style="margin-bottom: 15px;">
+                <button id="btnFetchDrive" class="btn"><i class="fa-solid fa-cloud-arrow-down"></i> 從 Google Drive 下載最新設定 (Fetch)</button>
+                <button id="btnPushDrive" class="btn btn-drive"><i class="fa-solid fa-cloud-arrow-up"></i> 儲存並上傳至 Google Drive (Push)</button>
+            </div>
+
+            <!-- 新增/編輯角色面板 -->
+            <details style="background:var(--input-bg); border:1px solid var(--border-color); border-radius:6px; padding:12px; margin-bottom:15px;" open>
+                <summary style="font-weight:bold; cursor:pointer; color:#ffffff;">➕ 新增 / 編輯角色預設包</summary>
+                <div style="margin-top:12px;">
+                    <div style="display:flex; gap:10px;">
+                        <div style="flex:2;">
+                            <label>角色名稱 (對應對話中的 item.name)：</label>
+                            <input type="text" id="inputCharName" placeholder="例如：伏雷、蘭">
+                        </div>
+                        <div style="flex:1;">
+                            <label>主題色 (Hex)：</label>
+                            <input type="text" id="inputCharColor" placeholder="#4a90e2" value="#4a90e2">
+                        </div>
+                    </div>
+
+                    <label>角色專屬 CSS 樣式：</label>
+                    <textarea id="inputCharCss" rows="3" placeholder=".char-msg[data-name='伏雷'] { border-left-color: #4a90e2; }"></textarea>
+
+                    <label>正則規則清單 (JSON 格式)：</label>
+                    <textarea id="inputCharRules" rows="4" placeholder='[
+  {
+    "ruleName": "狀態欄",
+    "findRegex": "<status>([\\s\\S]*?)</status>",
+    "replaceString": "<details class=\"special-block\"><summary>📊 狀態</summary><div>$1</div></details>"
+  }
+]'></textarea>
+
+                    <div class="btn-group">
+                        <button id="btnSavePresetLocal" class="btn btn-primary"><i class="fa-solid fa-plus"></i> 新增 / 更新至清單</button>
+                        <button id="btnResetForm" class="btn"><i class="fa-solid fa-rotate-left"></i> 清空表單</button>
+                    </div>
+                </div>
+            </details>
+
+            <!-- 角色清單 -->
+            <label style="margin-top:15px; font-size:1em; color:#ffffff;">📋 目前角色設定清單：</label>
+            <div id="presetGrid" class="preset-grid">
+                <div style="color:var(--meta-color); font-size:0.9em;">尚無角色設定。</div>
+            </div>
+        </div>
+
+        <div id="syncLoginPrompt" style="text-align:center; padding:20px; color:var(--meta-color);">
+            <i class="fa-solid fa-lock" style="font-size:2em; margin-bottom:10px; display:block;"></i>
+            請先在上方完成 Google 雲端硬碟授權，以啟用同步功能。
+        </div>
+    </div>
+
+</div>
+
+<script>
+    // ================= 狀態管理 =================
+    const STORAGE_KEY_CLIENT_ID = 'st_gdrive_client_id_v1';
+    const STORAGE_KEY_LOCAL_PRESETS = 'st_gdrive_local_presets_v1';
+    const GDRIVE_FILE_NAME = 'st_character_presets.json';
+    const SCOPES = 'https://www.googleapis.com/auth/drive.appdata https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email';
+
+    let tokenClient = null;
+    let accessToken = null;
+    let driveFileId = null;
+    let characterPresets = {};
+
+    // ================= 初始化載入 =================
+    document.addEventListener('DOMContentLoaded', () => {
+        // 載入快取的 Client ID
+        const savedClientId = localStorage.getItem(STORAGE_KEY_CLIENT_ID);
+        if (savedClientId) {
+            document.getElementById('clientIdInput').value = savedClientId;
+            initGoogleClient(savedClientId);
+        }
+
+        // 載入本地角色資料
+        const savedPresets = localStorage.getItem(STORAGE_KEY_LOCAL_PRESETS);
+        if (savedPresets) {
+            try { characterPresets = JSON.parse(savedPresets); } catch(e){}
+        }
+
+        // 綁定事件
+        document.getElementById('btnSaveClientId').addEventListener('click', () => {
+            const val = document.getElementById('clientIdInput').value.trim();
+            if (!val) return alert('請輸入有效的 Client ID！');
+            localStorage.setItem(STORAGE_KEY_CLIENT_ID, val);
+            initGoogleClient(val);
+        });
+
+        document.getElementById('btnClearClientId').addEventListener('click', () => {
+            if (!confirm('確定要清除 Client ID 快取嗎？')) return;
+            localStorage.removeItem(STORAGE_KEY_CLIENT_ID);
+            document.getElementById('clientIdInput').value = '';
+            location.reload();
+        });
+
+        document.getElementById('btnAuthDrive').addEventListener('click', handleAuthClick);
+        document.getElementById('btnRevokeAuth').addEventListener('click', handleRevokeAuth);
+        document.getElementById('btnSavePresetLocal').addEventListener('click', handleSavePresetLocal);
+        document.getElementById('btnResetForm').addEventListener('click', resetPresetForm);
+        document.getElementById('btnFetchDrive').addEventListener('click', fetchPresetsFromDrive);
+        document.getElementById('btnPushDrive').addEventListener('click', pushPresetsToDrive);
+    });
+
+    // ================= Google Identity Services 初始化 =================
+    function initGoogleClient(clientId) {
+        if (typeof google === 'undefined' || !google.accounts) {
+            setTimeout(() => initGoogleClient(clientId), 300);
+            return;
+        }
+
+        try {
+            tokenClient = google.accounts.oauth2.initTokenClient({
+                client_id: clientId,
+                scope: SCOPES,
+                callback: handleTokenResponse,
+            });
+
+            const badge = document.getElementById('configStatusBadge');
+            badge.className = 'badge badge-success';
+            badge.textContent = 'Client ID 已設定';
+            document.getElementById('btnAuthDrive').removeAttribute('disabled');
+        } catch (err) {
+            console.error('初始化失敗:', err);
+            alert('Google Client 初始化失敗：' + err.message);
+        }
+    }
+
+    function handleAuthClick() {
+        if (!tokenClient) return alert('請先設定 Client ID！');
+        tokenClient.requestAccessToken({ prompt: 'consent' });
+    }
+
+    async function handleTokenResponse(resp) {
+        if (resp.error !== undefined) {
+            console.error('授權失敗:', resp);
+            return alert('Google 授權失敗：' + resp.error);
+        }
+        accessToken = resp.access_token;
+        updateAuthUI(true);
+
+        // 讀取使用者基本資料
+        fetchUserInfo();
+        // 搜尋雲端硬碟檔案
+        await checkDriveFile();
+    }
+
+    function handleRevokeAuth() {
+        if (accessToken) {
+            google.accounts.oauth2.revoke(accessToken, () => {
+                accessToken = null;
+                driveFileId = null;
+                updateAuthUI(false);
+            });
+        } else {
+            updateAuthUI(false);
+        }
+    }
+
+    async function fetchUserInfo() {
+        if (!accessToken) return;
+        try {
+            const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+                headers: { 'Authorization': `Bearer ${accessToken}` }
+            });
+            if (res.ok) {
+                const user = await res.json();
+                document.getElementById('userAvatar').src = user.picture || 'https://via.placeholder.com/48';
+                document.getElementById('userName').textContent = user.name || 'Google 使用者';
+                document.getElementById('userEmail').textContent = user.email || '已成功連線 Google 雲端硬碟';
+            }
+        } catch(e){}
+    }
+
+    function updateAuthUI(isAuthed) {
+        const authBadge = document.getElementById('authStatusBadge');
+        const loggedInSec = document.getElementById('loggedInSection');
+        const loggedOutSec = document.getElementById('loggedOutSection');
+        const syncBadge = document.getElementById('syncStatusBadge');
+        const syncContent = document.getElementById('syncContentSection');
+        const syncPrompt = document.getElementById('syncLoginPrompt');
+
+        if (isAuthed) {
+            authBadge.className = 'badge badge-success';
+            authBadge.textContent = '已連線雲端硬碟';
+            loggedInSec.classList.remove('hidden');
+            loggedOutSec.classList.add('hidden');
+
+            syncBadge.className = 'badge badge-success';
+            syncBadge.textContent = '可雙向同步';
+            syncContent.classList.remove('hidden');
+            syncPrompt.classList.add('hidden');
+            renderPresetGrid();
+        } else {
+            authBadge.className = 'badge badge-warning';
+            authBadge.textContent = '未授權';
+            loggedInSec.classList.add('hidden');
+            loggedOutSec.classList.remove('hidden');
+
+            syncBadge.className = 'badge badge-warning';
+            syncBadge.textContent = '等待授權';
+            syncContent.classList.add('hidden');
+            syncPrompt.classList.remove('hidden');
+        }
+    }
+
+    // ================= Google Drive REST API 操作 =================
+    async function checkDriveFile() {
+        if (!accessToken) return;
+        const fileInfoEl = document.getElementById('driveFileInfo');
+        fileInfoEl.textContent = '雲端檔案：搜尋中...';
+
+        try {
+            // 搜尋 appDataFolder 中的 st_character_presets.json
+            const query = encodeURIComponent(`name = '${GDRIVE_FILE_NAME}' and trashed = false`);
+            const url = `https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=${query}&fields=files(id,name,modifiedTime)`;
+            
+            const res = await fetch(url, { headers: { 'Authorization': `Bearer ${accessToken}` } });
+            if (!res.ok) throw new Error(await res.text());
+            const data = await res.json();
+
+            if (data.files && data.files.length > 0) {
+                driveFileId = data.files[0].id;
+                const modTime = new Date(data.files[0].modifiedTime).toLocaleString('zh-TW');
+                fileInfoEl.textContent = `雲端檔案 ID: ${driveFileId} (最後更新: ${modTime})`;
+                // 自動抓取一次最新資料
+                await fetchPresetsFromDrive();
+            } else {
+                driveFileId = null;
+                fileInfoEl.textContent = '雲端檔案：尚未建立（儲存時將自動建立於個人 Drive AppData）';
+            }
+        } catch (err) {
+            console.error('搜尋雲端檔案失敗:', err);
+            fileInfoEl.textContent = '搜尋雲端檔案發生錯誤：' + err.message;
+        }
+    }
+
+    async function fetchPresetsFromDrive() {
+        if (!accessToken || !driveFileId) {
+            if (!driveFileId) alert('尚未在 Google Drive 建立過檔案，請先點擊「儲存並上傳 (Push)」！');
+            return;
+        }
+
+        try {
+            const url = `https://www.googleapis.com/drive/v3/files/${driveFileId}?alt=media`;
+            const res = await fetch(url, { headers: { 'Authorization': `Bearer ${accessToken}` } });
+            if (!res.ok) throw new Error(await res.text());
+            const cloudData = await res.json();
+
+            characterPresets = cloudData;
+            savePresetsLocal();
+            renderPresetGrid();
+            alert('🎉 成功從您的 Google Drive 下載最新角色設定！');
+        } catch (err) {
+            console.error('下載失敗:', err);
+            alert('下載失敗：' + err.message);
+        }
+    }
+
+    async function pushPresetsToDrive() {
+        if (!accessToken) return alert('請先完成 Google 授權！');
+
+        const contentString = JSON.stringify(characterPresets, null, 2);
+
+        try {
+            if (driveFileId) {
+                // 更新既有檔案 (PATCH)
+                const url = `https://www.googleapis.com/upload/drive/v3/files/${driveFileId}?uploadType=media`;
+                const res = await fetch(url, {
+                    method: 'PATCH',
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: contentString
+                });
+                if (!res.ok) throw new Error(await res.text());
+            } else {
+                // 建立新檔案於 appDataFolder (Multipart Upload)
+                const metadata = {
+                    name: GDRIVE_FILE_NAME,
+                    parents: ['appDataFolder']
+                };
+                const boundary = '-------314159265358979323846';
+                const delimiter = "\r\n--" + boundary + "\r\n";
+                const close_delim = "\r\n--" + boundary + "--";
+
+                let multipartRequestBody =
+                    delimiter +
+                    'Content-Type: application/json; charset=UTF-8\r\n\r\n' +
+                    JSON.stringify(metadata) +
+                    delimiter +
+                    'Content-Type: application/json\r\n\r\n' +
+                    contentString +
+                    close_delim;
+
+                const url = 'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart';
+                const res = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`,
+                        'Content-Type': `multipart/related; boundary=${boundary}`
+                    },
+                    body: multipartRequestBody
+                });
+                if (!res.ok) throw new Error(await res.text());
+                const data = await res.json();
+                driveFileId = data.id;
+            }
+
+            alert('✅ 成功上傳並同步至您的個人 Google Drive 專屬空間！');
+            await checkDriveFile();
+        } catch (err) {
+            console.error('上傳失敗:', err);
+            alert('上傳至 Google Drive 失敗：' + err.message);
+        }
+    }
+
+    // ================= 角色設定管理 (本機操作) =================
+    function handleSavePresetLocal() {
+        const charName = document.getElementById('inputCharName').value.trim();
+        const themeColor = document.getElementById('inputCharColor').value.trim() || '#4a90e2';
+        const customCss = document.getElementById('inputCharCss').value.trim();
+        const rawRules = document.getElementById('inputCharRules').value.trim();
+
+        if (!charName) return alert('請輸入角色名稱！');
+
+        let parsedRules = [];
+        if (rawRules) {
+            try {
+                parsedRules = JSON.parse(rawRules);
+                if (!Array.isArray(parsedRules)) throw new Error('規則需為陣列格式 [ ... ]');
+            } catch (e) {
+                return alert('正則規則 JSON 格式有誤：' + e.message);
+            }
+        }
+
+        characterPresets[charName] = {
+            themeColor: themeColor,
+            customCss: customCss,
+            rules: parsedRules
+        };
+
+        savePresetsLocal();
+        renderPresetGrid();
+        resetPresetForm();
+        alert(`角色「${charName}」已新增至本機清單！請記得點擊「儲存並上傳至 Google Drive」同步至雲端。`);
+    }
+
+    function deletePresetLocal(charName) {
+        if (!confirm(`確定要刪除角色「${charName}」嗎？`)) return;
+        delete characterPresets[charName];
+        savePresetsLocal();
+        renderPresetGrid();
+    }
+
+    function editPresetLocal(charName) {
+        const p = characterPresets[charName];
+        if (!p) return;
+        document.getElementById('inputCharName').value = charName;
+        document.getElementById('inputCharColor').value = p.themeColor || '#4a90e2';
+        document.getElementById('inputCharCss').value = p.customCss || '';
+        document.getElementById('inputCharRules').value = JSON.stringify(p.rules || [], null, 2);
+        window.scrollTo({ top: document.getElementById('syncCard').offsetTop - 30, behavior: 'smooth' });
+    }
+
+    function resetPresetForm() {
+        document.getElementById('inputCharName').value = '';
+        document.getElementById('inputCharColor').value = '#4a90e2';
+        document.getElementById('inputCharCss').value = '';
+        document.getElementById('inputCharRules').value = '';
+    }
+
+    function savePresetsLocal() {
+        localStorage.setItem(STORAGE_KEY_LOCAL_PRESETS, JSON.stringify(characterPresets));
+    }
+
+    function renderPresetGrid() {
+        const grid = document.getElementById('presetGrid');
+        grid.innerHTML = '';
+
+        const keys = Object.keys(characterPresets);
+        if (keys.length === 0) {
+            grid.innerHTML = '<div style="color:var(--meta-color); font-size:0.9em; grid-column: 1/-1;">尚無任何角色設定。請在上方表單新增角色！</div>';
+            return;
+        }
+
+        keys.forEach(charName => {
+            const p = characterPresets[charName];
+            const card = document.createElement('div');
+            card.className = 'preset-card';
+
+            const ruleCount = Array.isArray(p.rules) ? p.rules.length : 0;
+            const color = p.themeColor || '#3b82f6';
+
+            card.innerHTML = `
+                <div>
+                    <div class="preset-card-header">
+                        <div class="char-name-badge">
+                            <span class="char-color-dot" style="background-color: ${color};"></span>
+                            <span>${charName}</span>
+                        </div>
+                        <span class="rules-count">${ruleCount} 條正則</span>
+                    </div>
+                    <div style="font-size:0.8em; color:var(--meta-color); max-height:36px; overflow:hidden; text-overflow:ellipsis;">
+                        ${p.customCss ? '🎨 含自訂 CSS' : '無自訂 CSS'}
+                    </div>
+                </div>
+                <div class="preset-actions">
+                    <button class="btn btn-primary btn-edit"><i class="fa-solid fa-pen"></i> 編輯</button>
+                    <button class="btn btn-danger btn-del"><i class="fa-solid fa-trash"></i> 刪除</button>
+                </div>
+            `;
+
+            card.querySelector('.btn-edit').onclick = () => editPresetLocal(charName);
+            card.querySelector('.btn-del').onclick = () => deletePresetLocal(charName);
+
+            grid.appendChild(card);
+        });
+    }
+</script>
+
+</body>
+</html>
