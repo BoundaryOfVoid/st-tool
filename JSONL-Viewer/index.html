@@ -208,6 +208,48 @@
             .search-bar button { order: 4; }
         }
 
+        /* ================= 雙層正則與腳本管理視覺樣式 ================= */
+        .script-layer-title { font-size: 0.88em; font-weight: bold; color: var(--accent-color); margin: 8px 0 4px 0; display: flex; align-items: center; justify-content: space-between; }
+        .script-file-badge { font-size: 0.78em; color: var(--meta-color); background: rgba(255,255,255,0.06); padding: 2px 6px; border-radius: 4px; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        
+        .script-group-card { background: var(--sys-message-bg); border: 1px solid var(--border-color); border-radius: 6px; margin-bottom: 8px; overflow: hidden; }
+        .script-group-header { display: flex; align-items: center; padding: 6px 8px; background: rgba(0,0,0,0.05); cursor: pointer; user-select: none; gap: 6px; }
+        body.dark-theme .script-group-header { background: rgba(255,255,255,0.03); }
+        .script-group-title { font-size: 0.85em; font-weight: bold; flex-grow: 1; display: flex; align-items: center; gap: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .script-group-count { font-size: 0.75em; color: var(--meta-color); }
+        .script-group-actions { display: flex; align-items: center; gap: 4px; }
+        .script-group-body { padding: 4px 6px; border-top: 1px solid var(--border-color); }
+        .script-group-body.collapsed { display: none; }
+        
+        .script-rule-item { display: flex; align-items: center; padding: 4px 6px; border-radius: 4px; margin-bottom: 3px; background: var(--bar-bg); border: 1px solid var(--border-color); gap: 6px; font-size: 0.82em; }
+        .script-rule-name { flex-grow: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
+        .script-rule-actions { display: flex; align-items: center; gap: 3px; }
+        .btn-rule-action { width: 22px !important; height: 22px !important; padding: 0 !important; font-size: 0.75em !important; margin: 0 !important; display: inline-flex !important; align-items: center !important; justify-content: center !important; border-radius: 3px !important; background: transparent !important; }
+        .btn-rule-action:hover { background: var(--btn-hover) !important; }
+
+        /* Switch 開關 */
+        .toggle-switch { position: relative; display: inline-block; width: 28px; height: 16px; flex-shrink: 0; margin: 0; }
+        .toggle-switch input { opacity: 0; width: 0; height: 0; position: absolute; }
+        .toggle-slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #555; transition: .2s; border-radius: 16px; }
+        .toggle-slider:before { position: absolute; content: ""; height: 12px; width: 12px; left: 2px; bottom: 2px; background-color: white; transition: .2s; border-radius: 50%; }
+        input:checked + .toggle-slider { background-color: var(--accent-color); }
+        input:checked + .toggle-slider:before { transform: translateX(12px); }
+
+        /* 通用彈窗 Modal */
+        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.65); backdrop-filter: blur(3px); z-index: 2000; display: flex; align-items: center; justify-content: center; padding: 15px; }
+        .modal-overlay.hidden { display: none !important; }
+        .modal-card { background: var(--bar-bg); color: var(--text-color); border: 1px solid var(--border-color); border-radius: 10px; width: 100%; max-width: 520px; max-height: 90vh; display: flex; flex-direction: column; box-shadow: 0 10px 25px rgba(0,0,0,0.5); overflow: hidden; animation: modalPop 0.2s cubic-bezier(0.16, 1, 0.3, 1); }
+        @keyframes modalPop { 0% { transform: scale(0.95); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+        .modal-header { padding: 12px 16px; border-bottom: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between; font-weight: bold; font-size: 1.05em; }
+        .modal-body { padding: 16px; overflow-y: auto; flex-grow: 1; }
+        .modal-footer { padding: 12px 16px; border-top: 1px solid var(--border-color); display: flex; justify-content: flex-end; gap: 8px; background: rgba(0,0,0,0.02); }
+        body.dark-theme .modal-footer { background: rgba(255,255,255,0.02); }
+        
+        .modal-body label { display: block; font-size: 0.85em; font-weight: 600; margin-bottom: 4px; color: var(--meta-color); }
+        .modal-body input[type="text"], .modal-body textarea, .modal-body select { width: 100%; box-sizing: border-box; background: var(--bg-color); color: var(--text-color); border: 1px solid var(--border-color); border-radius: 4px; padding: 8px 10px; font-size: 0.9em; margin-bottom: 12px; outline: none; font-family: inherit; }
+        .modal-body textarea { font-family: monospace; resize: vertical; }
+        .modal-body input:focus, .modal-body textarea:focus, .modal-body select:focus { border-color: var(--accent-color); }
+
         /* ================= 響應式佈局 (置於最底以確保覆蓋權重) ================= */
         
         /* 電腦版寬度 */
@@ -324,30 +366,34 @@
                 </div>
             </div>
 
-            <!-- 視覺預設包管理器 -->
+            <!-- 樣式與正則腳本庫 (雙層制) -->
             <div class="nav-section">
-                <label>🎨 視覺預設包管理器</label>
-                <select id="presetSelect" style="margin-bottom: 6px;"></select>
-                
-                <div class="jump-group" style="margin-bottom: 6px;">
-                    <input type="text" id="newPresetName" placeholder="新建預設包名稱">
-                    <button id="btnCreatePreset" style="width: 50px;">建立</button>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                    <label style="margin:0; font-size:0.95em;">🎨 樣式與正則腳本庫</label>
                 </div>
-                
-                <details class="nested-manager-box">
-                    <summary style="font-size: 0.85em; cursor: pointer; color: var(--meta-color);">管理目前預設包條目</summary>
-                    <div id="presetRulesList" style="max-height: 120px; overflow-y: auto; margin: 6px 0;"></div>
-                    
-                    <input type="text" id="ruleNameInput" placeholder="條目名稱 (例: 狀態列)">
-                    <input type="text" id="rulePatternInput" placeholder="尋找正則 (Pattern)">
-                    <textarea id="ruleTemplateInput" placeholder="替換 HTML 範本 (Template, 支持 $1, $2)" rows="3"></textarea>
-                    <button id="btnAddRule" style="font-size: 0.85em; padding: 4px; background: var(--btn-hover);">➕ 新增條目至此預設包</button>
-                    <button id="btnDeletePreset" style="font-size: 0.85em; padding: 4px; background: #2c0b0e; color: #ea868f; margin-top: 4px;">💥 刪除整個預設包</button>
-                </details>
 
-                <div class="btn-group" style="margin-top: 6px;">
-                    <button id="btnImportPreset" onclick="document.getElementById('regexFileInput').click()">📥 匯入</button>
-                    <button id="btnExportPreset">📤 匯出</button>
+                <!-- 🌍 第 1 層：全域預設腳本 (Preset Scripts) -->
+                <div class="script-layer-title">
+                    <span>🌍 全域預設腳本</span>
+                    <button class="btn-rule-action" id="btnAddGlobalGroup" title="新增全域分組" style="font-size:0.85em; width:auto !important; padding:1px 6px !important;">➕ 分組</button>
+                </div>
+                <div id="globalGroupsContainer"></div>
+
+                <!-- 📁 第 2 層：區域檔案腳本 (Scoped Scripts) -->
+                <div class="script-layer-title" style="margin-top:12px;">
+                    <span>📁 當前檔案腳本</span>
+                    <div style="display:flex; gap:3px;">
+                        <button class="btn-rule-action" id="btnCloneFileProfile" title="複製其他檔案設定" style="font-size:0.8em; width:auto !important; padding:1px 6px !important;">📋 複製</button>
+                        <button class="btn-rule-action" id="btnAddFileGroup" title="新增檔案專屬分組" style="font-size:0.8em; width:auto !important; padding:1px 6px !important;">➕ 分組</button>
+                    </div>
+                </div>
+                <div id="fileScopeNameDisplay" class="script-file-badge" style="margin-bottom:6px; display:none;" title="當前檔案"></div>
+                <div id="fileGroupsContainer"></div>
+
+                <!-- 匯入 / 匯出 -->
+                <div class="btn-group" style="margin-top: 10px;">
+                    <button id="btnImportPreset" onclick="document.getElementById('regexFileInput').click()">📥 匯入 JSON</button>
+                    <button id="btnExportPreset">📤 匯出 JSON</button>
                 </div>
                 <input type="file" id="regexFileInput" accept=".json" style="display: none;">
 
@@ -378,6 +424,64 @@
     <div id="output"></div>
     <div id="scrollSentinel"></div>
 
+    <!-- 條目編輯彈窗 (Edit Rule Modal) -->
+    <div id="editRuleModal" class="modal-overlay hidden">
+        <div class="modal-card">
+            <div class="modal-header">
+                <span id="editModalTitle">✏️ 編輯正則條目</span>
+                <button class="btn-rule-action" id="btnModalClose" style="font-size:1.1em;">✕</button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="modalTargetLayer">
+                <input type="hidden" id="modalTargetGroup">
+                <input type="hidden" id="modalTargetRuleId">
+
+                <label for="modalRuleName">條目名稱：</label>
+                <input type="text" id="modalRuleName" placeholder="例如：📊 Profile 折疊">
+
+                <label for="modalFindRegex">尋找正則 (Pattern)：</label>
+                <input type="text" id="modalFindRegex" placeholder="例如：<profile>([\s\S]*?)</profile>">
+
+                <label for="modalReplaceString">替換 HTML 範本 (Template，支援 $1, $2)：</label>
+                <textarea id="modalReplaceString" rows="4" placeholder="<details class='profile-box'><summary>📊 Profile</summary><div>$1</div></details>"></textarea>
+
+                <label for="modalCustomCss">專屬 CSS 樣式 (選填，直接套用於替換出的標籤)：</label>
+                <textarea id="modalCustomCss" rows="3" placeholder=".profile-box { border-left: 3px solid #3b82f6; }"></textarea>
+
+                <div style="display:flex; align-items:center; gap:8px; margin-top:6px;">
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="modalRuleEnabled" checked>
+                        <span class="toggle-slider"></span>
+                    </label>
+                    <span style="font-size:0.9em; font-weight:bold;">啟用此條目</span>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn" id="btnModalCancel">取消</button>
+                <button class="btn btn-primary" id="btnModalSave"><i class="fa-solid fa-floppy-disk"></i> 儲存並套用</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 複製檔案設定彈窗 (Clone Profile Modal) -->
+    <div id="cloneProfileModal" class="modal-overlay hidden">
+        <div class="modal-card" style="max-width:400px;">
+            <div class="modal-header">
+                <span>📋 複製其他檔案設定</span>
+                <button class="btn-rule-action" id="btnCloneModalClose" style="font-size:1.1em;">✕</button>
+            </div>
+            <div class="modal-body">
+                <p style="font-size:0.85em; color:var(--meta-color); margin-top:0;">將已儲存檔案的正則群組與樣式完整複製給當前檔案：</p>
+                <label for="cloneSourceSelect">選擇來源檔案設定：</label>
+                <select id="cloneSourceSelect"></select>
+            </div>
+            <div class="modal-footer">
+                <button class="btn" id="btnCloneCancel">取消</button>
+                <button class="btn btn-primary" id="btnCloneConfirm"><i class="fa-solid fa-copy"></i> 確認複製</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         // 設定 Marked.js 將單次換行轉譯為 <br>
         marked.use({ breaks: true });
@@ -390,7 +494,6 @@
         let currentContentSize = 16;
         let currentReasoningSize = 14;
         let dynamicStyleTag = null;
-        let customPresets = {};
         let searchKeyword = '';
         let searchTarget = 'all';
         let searchResults = [];
@@ -607,45 +710,449 @@
             }
         }
 
-        // ================= 2. 預設包管理與本地儲存 =================
-        function loadPresets() {
-            const stored = localStorage.getItem('st_package_presets_v2');
-            if (stored) customPresets = JSON.parse(stored);
-            else { customPresets = {...defaultPackage}; savePresets(); }
-            refreshPresetDropdown();
-        }
-
-        function savePresets() { localStorage.setItem('st_package_presets_v2', JSON.stringify(customPresets)); }
-
-        function refreshPresetDropdown() {
-            const select = document.getElementById('presetSelect'); const previousValue = select.value; select.innerHTML = '';
-            Object.keys(customPresets).forEach(name => {
-                const opt = document.createElement('option'); opt.value = name; opt.textContent = name; select.appendChild(opt);
-            });
-            if (previousValue && customPresets[previousValue]) select.value = previousValue;
-            renderRulesListUI();
-        }
-
-        function renderRulesListUI() {
-            const listDiv = document.getElementById('presetRulesList'); listDiv.innerHTML = '';
-            const currentPkg = document.getElementById('presetSelect').value;
-            if (!currentPkg || !customPresets[currentPkg]) return;
-            customPresets[currentPkg].forEach((rule, idx) => {
-                const row = document.createElement('div'); row.className = 'regex-rule-node';
-                row.innerHTML = `<span>${rule.ruleName}</span><button onclick="deleteRuleNode(${idx})">刪除</button>`;
-                listDiv.appendChild(row);
-            });
-        }
-
-        window.deleteRuleNode = function(idx) {
-            const currentPkg = document.getElementById('presetSelect').value; if (!currentPkg) return;
-            customPresets[currentPkg].splice(idx, 1); savePresets(); renderRulesListUI();
-            if (globalParsedData.length) renderOutput();
+        // ================= 2. 雙層正則與腳本管理引擎 (v3) =================
+        const SCRIPT_STORAGE_KEY_V3 = 'st_script_engine_v3';
+        let currentFileName = '';
+        let scriptEngineData = {
+            version: 3,
+            globalPresets: {
+                "預設美化組": {
+                    enabled: true,
+                    rules: [
+                        {
+                            id: "rule_g_1",
+                            name: "📊 Profile",
+                            enabled: true,
+                            findRegex: "<profile>([\\s\\S]*?)<\\/profile>",
+                            replaceString: "<details class='special-block profile-block'><summary>📊 Profile</summary><div class='special-content'>$1</div></details>",
+                            customCss: ".profile-block { border-left: 3px solid #3b82f6; }"
+                        },
+                        {
+                            id: "rule_g_2",
+                            name: "📻 Meow FM",
+                            enabled: true,
+                            findRegex: "<meow_FM>([\\s\\S]*?)<\\/meow_FM>",
+                            replaceString: "<details class='special-block fm-block'><summary>📻 Meow FM</summary><div class='special-content'>$1</div></details>",
+                            customCss: ""
+                        }
+                    ]
+                }
+            },
+            fileScopedPresets: {}
         };
+
+        function generateUniqueId(prefix = 'rule') {
+            return prefix + '_' + Date.now().toString(36) + '_' + Math.random().toString(36).substr(2, 5);
+        }
+
+        function loadScriptEngineData() {
+            const rawV3 = localStorage.getItem(SCRIPT_STORAGE_KEY_V3);
+            if (rawV3) {
+                try {
+                    scriptEngineData = JSON.parse(rawV3);
+                    if (!scriptEngineData.globalPresets) scriptEngineData.globalPresets = {};
+                    if (!scriptEngineData.fileScopedPresets) scriptEngineData.fileScopedPresets = {};
+                } catch(e) {}
+            } else {
+                // 舊版 v2 平滑遷移
+                const rawV2 = localStorage.getItem('st_package_presets_v2');
+                if (rawV2) {
+                    try {
+                        const legacy = JSON.parse(rawV2);
+                        scriptEngineData.globalPresets = {};
+                        Object.keys(legacy).forEach(pkgName => {
+                            scriptEngineData.globalPresets[pkgName] = {
+                                enabled: true,
+                                rules: legacy[pkgName].map(r => ({
+                                    id: generateUniqueId('rule_g'),
+                                    name: r.ruleName || '未命名條目',
+                                    enabled: true,
+                                    findRegex: r.findRegex || '',
+                                    replaceString: r.replaceString || '',
+                                    customCss: ''
+                                }))
+                            };
+                        });
+                    } catch(e){}
+                }
+                saveScriptEngineData();
+            }
+            renderScriptEngineUI();
+            injectAllRuleStyles();
+        }
+
+        function saveScriptEngineData() {
+            localStorage.setItem(SCRIPT_STORAGE_KEY_V3, JSON.stringify(scriptEngineData));
+            injectAllRuleStyles();
+        }
+
+        function injectAllRuleStyles() {
+            let aggregatedCss = '';
+            // 收集全域啟用規則 CSS
+            if (scriptEngineData.globalPresets) {
+                Object.values(scriptEngineData.globalPresets).forEach(group => {
+                    if (group.enabled && Array.isArray(group.rules)) {
+                        group.rules.forEach(r => {
+                            if (r.enabled && r.customCss) aggregatedCss += '\n' + r.customCss;
+                        });
+                    }
+                });
+            }
+            // 收集當前檔案啟用規則 CSS
+            if (currentFileName && scriptEngineData.fileScopedPresets?.[currentFileName]?.enabled) {
+                const fGroups = scriptEngineData.fileScopedPresets[currentFileName].groups;
+                if (fGroups) {
+                    Object.values(fGroups).forEach(group => {
+                        if (group.enabled && Array.isArray(group.rules)) {
+                            group.rules.forEach(r => {
+                                if (r.enabled && r.customCss) aggregatedCss += '\n' + r.customCss;
+                            });
+                        }
+                    });
+                }
+            }
+
+            if (!dynamicStyleTag) {
+                dynamicStyleTag = document.createElement('style');
+                dynamicStyleTag.id = 'st-dynamic-injected-css';
+                document.head.appendChild(dynamicStyleTag);
+            }
+            dynamicStyleTag.textContent = aggregatedCss;
+        }
+
+        function renderScriptEngineUI() {
+            renderGlobalGroupsUI();
+            renderFileGroupsUI();
+        }
+
+        function renderGlobalGroupsUI() {
+            const container = document.getElementById('globalGroupsContainer');
+            if (!container) return;
+            container.innerHTML = '';
+
+            const groups = scriptEngineData.globalPresets || {};
+            const groupNames = Object.keys(groups);
+            if (groupNames.length === 0) {
+                container.innerHTML = '<div style="font-size:0.8em; color:var(--meta-color); padding:4px;">尚無全域分組，點擊 ➕ 分組 建立</div>';
+                return;
+            }
+
+            groupNames.forEach(gName => {
+                const group = groups[gName];
+                const card = createGroupCardDOM('global', gName, group);
+                container.appendChild(card);
+            });
+        }
+
+        function renderFileGroupsUI() {
+            const container = document.getElementById('fileGroupsContainer');
+            const nameBadge = document.getElementById('fileScopeNameDisplay');
+            if (!container) return;
+            container.innerHTML = '';
+
+            if (!currentFileName) {
+                if (nameBadge) nameBadge.style.display = 'none';
+                container.innerHTML = '<div style="font-size:0.8em; color:var(--meta-color); padding:4px;">載入 .jsonl 檔案後將自動關聯專屬腳本</div>';
+                return;
+            }
+
+            if (nameBadge) {
+                nameBadge.style.display = 'inline-block';
+                nameBadge.textContent = '📄 ' + currentFileName;
+                nameBadge.title = currentFileName;
+            }
+
+            const fileScope = scriptEngineData.fileScopedPresets[currentFileName];
+            if (!fileScope || !fileScope.groups || Object.keys(fileScope.groups).length === 0) {
+                container.innerHTML = '<div style="font-size:0.8em; color:var(--meta-color); padding:4px;">此檔案尚無專屬分組，可點擊上方 ➕ 分組 或 📋 複製</div>';
+                return;
+            }
+
+            Object.keys(fileScope.groups).forEach(gName => {
+                const group = fileScope.groups[gName];
+                const card = createGroupCardDOM('file', gName, group);
+                container.appendChild(card);
+            });
+        }
+
+        function createGroupCardDOM(layer, groupName, groupData) {
+            const card = document.createElement('div');
+            card.className = 'script-group-card';
+
+            const rules = groupData.rules || [];
+            const header = document.createElement('div');
+            header.className = 'script-group-header';
+
+            header.innerHTML = `
+                <span class="group-toggle-icon" style="font-size:0.75em; color:var(--meta-color); cursor:pointer;">▼</span>
+                <span class="script-group-title" title="${groupName}">
+                    ${groupName}
+                    <span class="script-group-count">(${rules.length})</span>
+                </span>
+                <div class="script-group-actions" onclick="event.stopPropagation()">
+                    <button class="btn-rule-action btn-add-rule" title="新增條目至此分組">➕</button>
+                    <button class="btn-rule-action btn-rename-group" title="重新命名分組">✎</button>
+                    <button class="btn-rule-action btn-delete-group" style="color:var(--danger-color);" title="刪除此分組">🗑</button>
+                    <label class="toggle-switch" title="切換分組全開/全關">
+                        <input type="checkbox" class="group-enable-switch" ${groupData.enabled !== false ? 'checked' : ''}>
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+            `;
+
+            const body = document.createElement('div');
+            body.className = 'script-group-body';
+
+            rules.forEach(rule => {
+                const itemEl = document.createElement('div');
+                itemEl.className = 'script-rule-item';
+                itemEl.innerHTML = `
+                    <label class="toggle-switch" title="啟用/停用此條目" onclick="event.stopPropagation()">
+                        <input type="checkbox" class="rule-enable-switch" ${rule.enabled !== false ? 'checked' : ''}>
+                        <span class="toggle-slider"></span>
+                    </label>
+                    <span class="script-rule-name" title="${rule.name}">${rule.name}</span>
+                    <div class="script-rule-actions">
+                        <button class="btn-rule-action btn-edit-rule" title="編輯條目">✎</button>
+                        <button class="btn-rule-action btn-delete-rule" style="color:var(--danger-color);" title="刪除條目">🗑</button>
+                    </div>
+                `;
+
+                // 條目開關
+                const ruleSwitch = itemEl.querySelector('.rule-enable-switch');
+                ruleSwitch.addEventListener('change', () => {
+                    rule.enabled = ruleSwitch.checked;
+                    saveScriptEngineData();
+                    if (globalParsedData.length) renderOutput();
+                });
+
+                // 編輯條目
+                itemEl.querySelector('.btn-edit-rule').addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    openEditRuleModal(layer, groupName, rule.id);
+                });
+
+                // 刪除條目
+                itemEl.querySelector('.btn-delete-rule').addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    if (!confirm(`確定要刪除條目「${rule.name}」嗎？`)) return;
+                    groupData.rules = groupData.rules.filter(r => r.id !== rule.id);
+                    saveScriptEngineData();
+                    renderScriptEngineUI();
+                    if (globalParsedData.length) renderOutput();
+                });
+
+                body.appendChild(itemEl);
+            });
+
+            // 點擊 Header 折疊展開
+            header.addEventListener('click', (e) => {
+                if (e.target.closest('.script-group-actions')) return;
+                body.classList.toggle('collapsed');
+                const icon = header.querySelector('.group-toggle-icon');
+                icon.textContent = body.classList.contains('collapsed') ? '▶' : '▼';
+            });
+
+            // 分組總開關
+            const groupSwitch = header.querySelector('.group-enable-switch');
+            groupSwitch.addEventListener('change', () => {
+                groupData.enabled = groupSwitch.checked;
+                saveScriptEngineData();
+                if (globalParsedData.length) renderOutput();
+            });
+
+            // 新增條目按鈕
+            header.querySelector('.btn-add-rule').addEventListener('click', () => {
+                openEditRuleModal(layer, groupName, null);
+            });
+
+            // 重新命名分組
+            header.querySelector('.btn-rename-group').addEventListener('click', () => {
+                const newName = prompt('請輸入新的分組名稱：', groupName);
+                if (!newName || newName.trim() === groupName) return;
+                const trimmed = newName.trim();
+                const parentObj = layer === 'global' ? scriptEngineData.globalPresets : scriptEngineData.fileScopedPresets[currentFileName].groups;
+                if (parentObj[trimmed]) return alert('此分組名稱已存在！');
+                parentObj[trimmed] = groupData;
+                delete parentObj[groupName];
+                saveScriptEngineData();
+                renderScriptEngineUI();
+            });
+
+            // 刪除分組
+            header.querySelector('.btn-delete-group').addEventListener('click', () => {
+                if (!confirm(`確定要刪除整個分組「${groupName}」及其底下的 ${rules.length} 條規則嗎？`)) return;
+                const parentObj = layer === 'global' ? scriptEngineData.globalPresets : scriptEngineData.fileScopedPresets[currentFileName].groups;
+                delete parentObj[groupName];
+                saveScriptEngineData();
+                renderScriptEngineUI();
+                if (globalParsedData.length) renderOutput();
+            });
+
+            card.appendChild(header);
+            card.appendChild(body);
+            return card;
+        }
+
+        // ================= 編輯條目彈窗邏輯 =================
+        function openEditRuleModal(layer, groupName, ruleId) {
+            document.getElementById('modalTargetLayer').value = layer;
+            document.getElementById('modalTargetGroup').value = groupName;
+            document.getElementById('modalTargetRuleId').value = ruleId || '';
+
+            const titleEl = document.getElementById('editModalTitle');
+            const nameInput = document.getElementById('modalRuleName');
+            const findRegexInput = document.getElementById('modalFindRegex');
+            const replaceStringInput = document.getElementById('modalReplaceString');
+            const customCssInput = document.getElementById('modalCustomCss');
+            const enabledInput = document.getElementById('modalRuleEnabled');
+
+            if (ruleId) {
+                titleEl.textContent = '✏️ 編輯正則條目';
+                const parentObj = layer === 'global' ? scriptEngineData.globalPresets : scriptEngineData.fileScopedPresets[currentFileName]?.groups;
+                const group = parentObj?.[groupName];
+                const rule = group?.rules.find(r => r.id === ruleId);
+                if (rule) {
+                    nameInput.value = rule.name || '';
+                    findRegexInput.value = rule.findRegex || '';
+                    replaceStringInput.value = rule.replaceString || '';
+                    customCssInput.value = rule.customCss || '';
+                    enabledInput.checked = rule.enabled !== false;
+                }
+            } else {
+                titleEl.textContent = '➕ 新增正則條目';
+                nameInput.value = '';
+                findRegexInput.value = '';
+                replaceStringInput.value = '';
+                customCssInput.value = '';
+                enabledInput.checked = true;
+            }
+
+            document.getElementById('editRuleModal').classList.remove('hidden');
+            nameInput.focus();
+        }
+
+        function closeEditRuleModal() {
+            document.getElementById('editRuleModal').classList.add('hidden');
+        }
+
+        function saveEditRuleModal() {
+            const layer = document.getElementById('modalTargetLayer').value;
+            const groupName = document.getElementById('modalTargetGroup').value;
+            const ruleId = document.getElementById('modalTargetRuleId').value;
+
+            const name = document.getElementById('modalRuleName').value.trim();
+            const findRegex = document.getElementById('modalFindRegex').value.trim();
+            const replaceString = document.getElementById('modalReplaceString').value;
+            const customCss = document.getElementById('modalCustomCss').value.trim();
+            const enabled = document.getElementById('modalRuleEnabled').checked;
+
+            if (!name) return alert('請填寫條目名稱！');
+            if (!findRegex) return alert('請填寫尋找正則！');
+
+            try {
+                let patternStr = findRegex;
+                let flags = 'gmi';
+                if (patternStr.startsWith('/') && patternStr.lastIndexOf('/') > 0) {
+                    const lastSlash = patternStr.lastIndexOf('/');
+                    flags = patternStr.substring(lastSlash + 1);
+                    patternStr = patternStr.substring(1, lastSlash);
+                }
+                new RegExp(patternStr, flags);
+            } catch (err) {
+                return alert('正則表達式語法有誤：\n' + err.message);
+            }
+
+            const parentObj = layer === 'global' ? scriptEngineData.globalPresets : scriptEngineData.fileScopedPresets[currentFileName]?.groups;
+            if (!parentObj || !parentObj[groupName]) return alert('找不到目標分組！');
+
+            const group = parentObj[groupName];
+            if (!Array.isArray(group.rules)) group.rules = [];
+
+            if (ruleId) {
+                const rule = group.rules.find(r => r.id === ruleId);
+                if (rule) {
+                    rule.name = name;
+                    rule.findRegex = findRegex;
+                    rule.replaceString = replaceString;
+                    rule.customCss = customCss;
+                    rule.enabled = enabled;
+                }
+            } else {
+                group.rules.push({
+                    id: generateUniqueId(layer === 'global' ? 'rule_g' : 'rule_f'),
+                    name: name,
+                    enabled: enabled,
+                    findRegex: findRegex,
+                    replaceString: replaceString,
+                    customCss: customCss
+                });
+            }
+
+            saveScriptEngineData();
+            renderScriptEngineUI();
+            closeEditRuleModal();
+            if (globalParsedData.length) renderOutput();
+        }
+
+        // ================= 複製檔案設定彈窗邏輯 =================
+        function openCloneProfileModal() {
+            if (!currentFileName) return alert('請先載入一份 .jsonl 檔案！');
+            const select = document.getElementById('cloneSourceSelect');
+            select.innerHTML = '';
+
+            const allFiles = Object.keys(scriptEngineData.fileScopedPresets || {}).filter(f => f !== currentFileName);
+            if (allFiles.length === 0) {
+                return alert('目前雲端或本地尚無其他檔案的設定可供複製！');
+            }
+
+            allFiles.forEach(f => {
+                const opt = document.createElement('option');
+                opt.value = f;
+                const gCount = Object.keys(scriptEngineData.fileScopedPresets[f].groups || {}).length;
+                opt.textContent = `${f} (${gCount} 個分組)`;
+                select.appendChild(opt);
+            });
+
+            document.getElementById('cloneProfileModal').classList.remove('hidden');
+        }
+
+        function closeCloneProfileModal() {
+            document.getElementById('cloneProfileModal').classList.add('hidden');
+        }
+
+        function confirmCloneProfile() {
+            const select = document.getElementById('cloneSourceSelect');
+            const srcFile = select.value;
+            if (!srcFile || !scriptEngineData.fileScopedPresets[srcFile]) return;
+
+            if (scriptEngineData.fileScopedPresets[currentFileName]?.groups && Object.keys(scriptEngineData.fileScopedPresets[currentFileName].groups).length > 0) {
+                if (!confirm(`複製將會覆蓋當前檔案「${currentFileName}」的專屬腳本，確定要繼續嗎？`)) return;
+            }
+
+            const srcGroups = scriptEngineData.fileScopedPresets[srcFile].groups || {};
+            const clonedGroups = JSON.parse(JSON.stringify(srcGroups));
+            Object.values(clonedGroups).forEach(group => {
+                if (Array.isArray(group.rules)) {
+                    group.rules.forEach(r => r.id = generateUniqueId('rule_f'));
+                }
+            });
+
+            if (!scriptEngineData.fileScopedPresets[currentFileName]) {
+                scriptEngineData.fileScopedPresets[currentFileName] = { enabled: true, groups: {} };
+            }
+            scriptEngineData.fileScopedPresets[currentFileName].groups = clonedGroups;
+
+            saveScriptEngineData();
+            renderScriptEngineUI();
+            closeCloneProfileModal();
+            if (globalParsedData.length) renderOutput();
+            alert(`🎉 成功從「${srcFile}」複製設定至當前檔案！`);
+        }
 
         // ================= 3. 核心生命週期與事件初始化 =================
         document.addEventListener('DOMContentLoaded', () => {
-            loadPresets();
+            loadScriptEngineData();
             
             // 綁定夜間/明亮模式
             document.getElementById('themeSelect').addEventListener('change', (e) => {
@@ -663,36 +1170,93 @@
             document.getElementById('btnExpandAll').addEventListener('click', () => { document.querySelectorAll('details').forEach(el => el.open = true); });
             document.getElementById('btnCollapseAll').addEventListener('click', () => { document.querySelectorAll('details').forEach(el => el.open = false); });
 
-            // 預設包管理增刪
-            document.getElementById('btnCreatePreset').addEventListener('click', () => {
-                const name = document.getElementById('newPresetName').value.trim();
-                if (!name) return alert('請输入預設包名稱！');
-                if (customPresets[name]) return alert('此預設包已存在！');
-                customPresets[name] = []; savePresets(); refreshPresetDropdown();
-                document.getElementById('presetSelect').value = name; renderRulesListUI();
-                document.getElementById('newPresetName').value = '';
+            // 雙層腳本按鈕事件
+            document.getElementById('btnAddGlobalGroup').addEventListener('click', () => {
+                const name = prompt('請輸入全域分組名稱：', '新全域分組');
+                if (!name || !name.trim()) return;
+                const trimmed = name.trim();
+                if (scriptEngineData.globalPresets[trimmed]) return alert('此分組名稱已存在！');
+                scriptEngineData.globalPresets[trimmed] = { enabled: true, rules: [] };
+                saveScriptEngineData();
+                renderScriptEngineUI();
             });
 
-            document.getElementById('btnDeletePreset').addEventListener('click', () => {
-                const currentPkg = document.getElementById('presetSelect').value; if (!currentPkg) return;
-                if (!confirm(`確定要刪除「${currentPkg}」嗎？`)) return;
-                delete customPresets[currentPkg]; savePresets(); refreshPresetDropdown();
-                if (globalParsedData.length) renderOutput();
+            document.getElementById('btnAddFileGroup').addEventListener('click', () => {
+                if (!currentFileName) return alert('請先載入 .jsonl 檔案！');
+                const name = prompt('請輸入檔案專屬分組名稱：', '新專屬分組');
+                if (!name || !name.trim()) return;
+                const trimmed = name.trim();
+                if (!scriptEngineData.fileScopedPresets[currentFileName]) {
+                    scriptEngineData.fileScopedPresets[currentFileName] = { enabled: true, groups: {} };
+                }
+                if (scriptEngineData.fileScopedPresets[currentFileName].groups[trimmed]) return alert('此分組名稱已存在！');
+                scriptEngineData.fileScopedPresets[currentFileName].groups[trimmed] = { enabled: true, rules: [] };
+                saveScriptEngineData();
+                renderScriptEngineUI();
             });
 
-            document.getElementById('btnAddRule').addEventListener('click', () => {
-                const currentPkg = document.getElementById('presetSelect').value; if (!currentPkg) return alert('請先選擇預設包！');
-                const ruleName = document.getElementById('ruleNameInput').value.trim();
-                const findRegex = document.getElementById('rulePatternInput').value.trim();
-                const replaceString = document.getElementById('ruleTemplateInput').value.trim();
-                if (!ruleName || !findRegex || !replaceString) return alert('欄位皆為必填！');
-                customPresets[currentPkg].push({ ruleName, findRegex, replaceString });
-                savePresets(); renderRulesListUI();
-                document.getElementById('ruleNameInput').value = ''; document.getElementById('rulePatternInput').value = ''; document.getElementById('ruleTemplateInput').value = '';
-                if (globalParsedData.length) renderOutput();
+            document.getElementById('btnCloneFileProfile').addEventListener('click', openCloneProfileModal);
+
+            // 彈窗按鈕事件
+            document.getElementById('btnModalClose').addEventListener('click', closeEditRuleModal);
+            document.getElementById('btnModalCancel').addEventListener('click', closeEditRuleModal);
+            document.getElementById('btnModalSave').addEventListener('click', saveEditRuleModal);
+
+            document.getElementById('btnCloneModalClose').addEventListener('click', closeCloneProfileModal);
+            document.getElementById('btnCloneCancel').addEventListener('click', closeCloneProfileModal);
+            document.getElementById('btnCloneConfirm').addEventListener('click', confirmCloneProfile);
+
+            // 匯入與匯出 JSON
+            document.getElementById('btnExportPreset').addEventListener('click', () => {
+                const str = JSON.stringify(scriptEngineData, null, 2);
+                const blob = new Blob([str], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `st_script_presets_v3_${Date.now()}.json`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
             });
 
-            document.getElementById('presetSelect').addEventListener('change', () => { renderRulesListUI(); if (globalParsedData.length) renderOutput(); });
+            document.getElementById('regexFileInput').addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    try {
+                        const parsed = JSON.parse(event.target.result);
+                        if (parsed.version === 3 || parsed.globalPresets || parsed.fileScopedPresets) {
+                            scriptEngineData = parsed;
+                        } else {
+                            // 舊版匯入支援
+                            scriptEngineData.globalPresets = {};
+                            Object.keys(parsed).forEach(pkgName => {
+                                scriptEngineData.globalPresets[pkgName] = {
+                                    enabled: true,
+                                    rules: parsed[pkgName].map(r => ({
+                                        id: generateUniqueId('rule_g'),
+                                        name: r.ruleName || '未命名條目',
+                                        enabled: true,
+                                        findRegex: r.findRegex || '',
+                                        replaceString: r.replaceString || '',
+                                        customCss: ''
+                                    }))
+                                };
+                            });
+                        }
+                        saveScriptEngineData();
+                        renderScriptEngineUI();
+                        if (globalParsedData.length) renderOutput();
+                        alert('🎉 成功匯入腳本設定！');
+                    } catch(err) {
+                        alert('匯入失敗：JSON 格式有誤！');
+                    }
+                    e.target.value = '';
+                };
+                reader.readAsText(file);
+            });
 
             // ================= Google Drive 雲端同步 =================
             const GOOGLE_CLIENT_ID = "15417722990-5j3m65biqhtf999f9ll7mvdd8dhhi3ee.apps.googleusercontent.com";
@@ -748,7 +1312,6 @@
                 gdriveAccessToken = resp.access_token;
                 updateGDriveUI(true);
 
-                // 讀取使用者基本資料
                 try {
                     const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
                         headers: { 'Authorization': `Bearer ${gdriveAccessToken}` }
@@ -766,7 +1329,6 @@
                     }
                 } catch(e){}
 
-                // 自動查詢雲端檔案
                 await findGDriveFile();
             }
 
@@ -805,12 +1367,31 @@
                         headers: { 'Authorization': `Bearer ${gdriveAccessToken}` }
                     });
                     if (!res.ok) throw new Error(await res.text());
-                    const cloudPresets = await res.json();
-                    customPresets = cloudPresets;
-                    savePresets();
-                    refreshPresetDropdown();
+                    const cloudData = await res.json();
+                    
+                    if (cloudData.version === 3 || cloudData.globalPresets || cloudData.fileScopedPresets) {
+                        scriptEngineData = cloudData;
+                    } else {
+                        // 舊版格式自動轉換
+                        scriptEngineData.globalPresets = {};
+                        Object.keys(cloudData).forEach(pkgName => {
+                            scriptEngineData.globalPresets[pkgName] = {
+                                enabled: true,
+                                rules: cloudData[pkgName].map(r => ({
+                                    id: generateUniqueId('rule_g'),
+                                    name: r.ruleName || '未命名條目',
+                                    enabled: true,
+                                    findRegex: r.findRegex || '',
+                                    replaceString: r.replaceString || '',
+                                    customCss: ''
+                                }))
+                            };
+                        });
+                    }
+                    saveScriptEngineData();
+                    renderScriptEngineUI();
                     if (globalParsedData.length) renderOutput();
-                    alert('🎉 成功從您的 Google Drive 載入最新預設包！');
+                    alert('🎉 成功從您的 Google Drive 載入最新腳本與樣式！');
                 } catch(err) {
                     console.error(err);
                     alert('下載失敗：' + err.message);
@@ -819,12 +1400,11 @@
 
             document.getElementById('btnGDrivePush').addEventListener('click', async () => {
                 if (!gdriveAccessToken) return alert('請先連線 Google 雲端硬碟！');
-                const contentString = JSON.stringify(customPresets, null, 2);
+                const contentString = JSON.stringify(scriptEngineData, null, 2);
 
                 try {
                     await findGDriveFile();
                     if (gdriveFileId) {
-                        // 更新既有檔案
                         const res = await fetch(`https://www.googleapis.com/upload/drive/v3/files/${gdriveFileId}?uploadType=media`, {
                             method: 'PATCH',
                             headers: {
@@ -835,7 +1415,6 @@
                         });
                         if (!res.ok) throw new Error(await res.text());
                     } else {
-                        // 建立新檔案於 appDataFolder
                         const metadata = { name: GDRIVE_FILE_NAME, parents: ['appDataFolder'] };
                         const boundary = '-------314159265358979323846';
                         const delimiter = "\r\n--" + boundary + "\r\n";
@@ -854,7 +1433,7 @@
                         const data = await res.json();
                         gdriveFileId = data.id;
                     }
-                    alert('✅ 預設包已成功上傳並保存至您的個人 Google Drive 專屬空間！');
+                    alert('✅ 全部全域與檔案專屬腳本已成功上傳保存至個人 Google Drive！');
                 } catch(err) {
                     console.error(err);
                     alert('上傳失敗：' + err.message);
@@ -945,10 +1524,26 @@
         document.getElementById('fileInput').addEventListener('change', function(e) {
             const file = e.target.files[0]; if (!file) return;
             
-            // 更新合併後的檔案標籤文字與 Hover 提示
+            currentFileName = file.name;
             const label = document.getElementById('fileNameDisplay');
             label.textContent = '📄 ' + file.name;
             label.title = file.name;
+
+            // 初始化或關聯該檔案專屬空間
+            if (!scriptEngineData.fileScopedPresets[currentFileName]) {
+                scriptEngineData.fileScopedPresets[currentFileName] = {
+                    enabled: true,
+                    groups: {
+                        "默認分組": {
+                            enabled: true,
+                            rules: []
+                        }
+                    }
+                };
+                saveScriptEngineData();
+            }
+            renderScriptEngineUI();
+            injectAllRuleStyles();
 
             const reader = new FileReader();
             reader.onload = function(event) {
@@ -987,30 +1582,37 @@
         // ================= 4. 正則標籤與 Markdown 轉譯 =================
         function processCustomTags(text) {
             if (!text) return text;
-            const currentPkg = document.getElementById('presetSelect').value;
-            if (currentPkg && customPresets[currentPkg]) {
-                customPresets[currentPkg].forEach(rule => {
-                    try {
-                        let patternStr = rule.findRegex; let flags = 'gi';
-                        if (patternStr.startsWith('/') && patternStr.lastIndexOf('/') > 0) {
-                            const lastSlash = patternStr.lastIndexOf('/'); flags = patternStr.substring(lastSlash + 1); patternStr = patternStr.substring(1, lastSlash);
-                        }
-                        const rx = new RegExp(patternStr, flags);
-                        text = text.replace(rx, function(...args) {
-                            let template = rule.replaceString;
-                            const styleMatch = template.match(/<style[^>]*>([\s\S]*?)<\/style>/i);
-                            if (styleMatch) { injectDynamicCSS(styleMatch[1]); template = template.replace(/<style[^>]*>([\s\S]*?)<\/style>/i, ''); }
-                            template = template.replace(/<\/?(html|head|body|meta)[^>]*>/gi, '');
-                            for (let i = 1; i < args.length - 2; i++) {
-                                const val = args[i] !== undefined ? args[i] : '';
-                                const cleanedVal = marked.parse(val).replace(/^<p>|<\/p>$/g, '').trim();
-                                template = template.replace(new RegExp('\\$' + i, 'g'), cleanedVal);
+
+            // 1. 套用全域啟用規則
+            if (scriptEngineData.globalPresets) {
+                Object.values(scriptEngineData.globalPresets).forEach(group => {
+                    if (group.enabled !== false && Array.isArray(group.rules)) {
+                        group.rules.forEach(rule => {
+                            if (rule.enabled !== false && rule.findRegex) {
+                                text = applySingleRule(text, rule);
                             }
-                            return template;
                         });
-                    } catch(e) {}
+                    }
                 });
             }
+
+            // 2. 套用當前檔案區域啟用規則
+            if (currentFileName && scriptEngineData.fileScopedPresets?.[currentFileName]?.enabled !== false) {
+                const fGroups = scriptEngineData.fileScopedPresets[currentFileName].groups;
+                if (fGroups) {
+                    Object.values(fGroups).forEach(group => {
+                        if (group.enabled !== false && Array.isArray(group.rules)) {
+                            group.rules.forEach(rule => {
+                                if (rule.enabled !== false && rule.findRegex) {
+                                    text = applySingleRule(text, rule);
+                                }
+                            });
+                        }
+                    });
+                }
+            }
+
+            // 3. 標準 details 折疊標籤相容
             text = text.replace(/<details[^>]*>([\s\S]*?)<\/details>/gi, function(match, innerContent) {
                 if (match.includes('class="sra"')) return match; 
                 let summary = '詳細資訊'; let content = innerContent;
@@ -1018,11 +1620,38 @@
                 if (summaryMatch) { summary = summaryMatch[1]; content = innerContent.replace(/<summary[^>]*>([\s\S]*?)<\/summary>/i, ''); }
                 return `<details class="special-block"><summary>${summary}</summary><div class="special-content">${marked.parse(content)}</div></details>`;
             });
+
             text = marked.parse(text);
             
             if (text.includes('class="language-mermaid"')) {
                 text = text.replace(/<pre><code class="language-mermaid">([\s\S]*?)<\/code><\/pre>/g, '<div class="mermaid">$1</div>');
             }
+            return text;
+        }
+
+        function applySingleRule(text, rule) {
+            try {
+                let patternStr = rule.findRegex;
+                let flags = 'gmi';
+                if (patternStr.startsWith('/') && patternStr.lastIndexOf('/') > 0) {
+                    const lastSlash = patternStr.lastIndexOf('/');
+                    flags = patternStr.substring(lastSlash + 1);
+                    patternStr = patternStr.substring(1, lastSlash);
+                }
+                const rx = new RegExp(patternStr, flags);
+                text = text.replace(rx, function(...args) {
+                    let template = rule.replaceString || '';
+                    const styleMatch = template.match(/<style[^>]*>([\s\S]*?)<\/style>/i);
+                    if (styleMatch) { injectDynamicCSS(styleMatch[1]); template = template.replace(/<style[^>]*>([\s\S]*?)<\/style>/i, ''); }
+                    template = template.replace(/<\/?(html|head|body|meta)[^>]*>/gi, '');
+                    for (let i = 1; i < args.length - 2; i++) {
+                        const val = args[i] !== undefined ? args[i] : '';
+                        const cleanedVal = marked.parse(val).replace(/^<p>|<\/p>$/g, '').trim();
+                        template = template.replace(new RegExp('\\$' + i, 'g'), cleanedVal);
+                    }
+                    return template;
+                });
+            } catch(e) {}
             return text;
         }
 
