@@ -130,6 +130,8 @@
         .checkbox-label input { margin-right: 8px; width: 14px; height: 14px; }
 
         .btn-cloud-action { font-size: 0.85em; padding: 5px; font-weight: bold; background-color: var(--details-bg); color: var(--summary-text); border-color: var(--details-border); }
+        .gdrive-action-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px; margin-top: 2px; }
+        .gdrive-action-grid button { width: 100%; min-width: 0; margin: 0; }
         #btnExport { font-weight: bold; color: #155724; background-color: #d4edda; border-color: #c3e6cb; margin-top: 5px; }
         body.dark-theme #btnExport { color: #75b798; background-color: #051b11; border-color: #0f5132; }
         #btnExportNovel { font-weight: bold; color: #4c2a85; background-color: #eee5ff; border-color: #d6c2ff; margin-top: 5px; }
@@ -260,6 +262,9 @@
         .modal-body input[type="text"], .modal-body textarea, .modal-body select { width: 100%; box-sizing: border-box; background: var(--bg-color); color: var(--text-color); border: 1px solid var(--border-color); border-radius: 4px; padding: 8px 10px; font-size: 0.9em; margin-bottom: 12px; outline: none; font-family: inherit; }
         .modal-body textarea { font-family: monospace; resize: vertical; }
         .modal-body input:focus, .modal-body textarea:focus, .modal-body select:focus { border-color: var(--accent-color); }
+        .gdrive-preview-meta { padding: 9px 11px; margin-bottom: 10px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-color); color: var(--meta-color); font-size: 0.82em; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
+        .gdrive-preview-summary { margin: 0 0 12px; padding: 10px 12px; border: 1px solid var(--details-border); border-radius: 6px; background: var(--details-bg); color: var(--text-color); font-size: 0.85em; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; }
+        .gdrive-preview-raw { margin: 0; padding: 12px; max-height: 48vh; overflow: auto; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-color); color: var(--text-color); font: 0.78em/1.5 Consolas, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
 
         /* ================= 響應式佈局 (置於最底以確保覆蓋權重) ================= */
         
@@ -418,7 +423,8 @@
                         <span id="gdriveUserName" style="font-weight:bold; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex-grow:1;">已連線雲端硬碟</span>
                         <button id="btnGDriveLogout" style="width:auto; padding:2px 6px; font-size:0.75em; margin:0; background:#dc3545; color:#fff;" title="中斷連線">登出</button>
                     </div>
-                    <div class="btn-group" style="margin-top: 2px;">
+                    <div class="gdrive-action-grid">
+                        <button id="btnGDriveView" class="btn-cloud-action" title="唯讀查看 Google Drive 中的預設包"><i class="fa-solid fa-eye"></i> 查看</button>
                         <button id="btnGDriveFetch" class="btn-cloud-action" title="從 Google Drive 下載最新預設包"><i class="fa-solid fa-cloud-arrow-down"></i> 下載 (Fetch)</button>
                         <button id="btnGDrivePush" class="btn-cloud-action" title="將本地預設包上傳至 Google Drive"><i class="fa-solid fa-cloud-arrow-up"></i> 上傳 (Push)</button>
                     </div>
@@ -435,6 +441,26 @@
 
     <div id="output"></div>
     <div id="scrollSentinel"></div>
+
+    <!-- Google Drive 雲端內容唯讀預覽 -->
+    <div id="gdrivePreviewModal" class="modal-overlay hidden">
+        <div class="modal-card" style="max-width:760px;">
+            <div class="modal-header">
+                <span>☁️ Google Drive 雲端內容</span>
+                <button class="btn-rule-action" id="btnGDrivePreviewClose" style="font-size:1.1em;">✕</button>
+            </div>
+            <div class="modal-body">
+                <div id="gdrivePreviewMeta" class="gdrive-preview-meta"></div>
+                <label>內容摘要</label>
+                <div id="gdrivePreviewSummary" class="gdrive-preview-summary"></div>
+                <label>原始 JSON（唯讀）</label>
+                <pre id="gdrivePreviewRaw" class="gdrive-preview-raw"></pre>
+            </div>
+            <div class="modal-footer">
+                <button id="btnGDrivePreviewDone" style="width:auto;">關閉</button>
+            </div>
+        </div>
+    </div>
 
     <!-- 小說 TXT 匯出選項 -->
     <div id="novelExportModal" class="modal-overlay hidden">
@@ -2066,6 +2092,7 @@
             let gdriveTokenClient = null;
             let gdriveAccessToken = null;
             let gdriveFileId = null;
+            let gdriveFileMetadata = null;
             let gdriveAuthRequestMode = 'manual';
             let gdriveAutoReconnectAttempted = false;
 
@@ -2134,11 +2161,13 @@
                     google.accounts.oauth2.revoke(gdriveAccessToken, () => {
                         gdriveAccessToken = null;
                         gdriveFileId = null;
+                        gdriveFileMetadata = null;
                         updateGDriveUI(false);
                     });
                 } else {
                     gdriveAccessToken = null;
                     gdriveFileId = null;
+                    gdriveFileMetadata = null;
                     updateGDriveUI(false);
                 }
             });
@@ -2147,6 +2176,7 @@
                 if (resp.error) {
                     gdriveAccessToken = null;
                     gdriveFileId = null;
+                    gdriveFileMetadata = null;
                     updateGDriveUI(false);
                     // 靜默重連失敗通常表示 Google 工作階段已過期；保留按鈕讓使用者手動登入。
                     if (gdriveAuthRequestMode !== 'silent') alert('Google 授權失敗：' + resp.error);
@@ -2182,36 +2212,129 @@
             }
 
             async function findGDriveFile() {
-                if (!gdriveAccessToken) return;
+                if (!gdriveAccessToken) return null;
                 try {
                     const q = encodeURIComponent(`name = '${GDRIVE_FILE_NAME}' and trashed = false`);
-                    const res = await fetch(`https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=${q}&fields=files(id,name,modifiedTime)`, {
-                        headers: { 'Authorization': `Bearer ${gdriveAccessToken}` }
-                    });
-                    if (res.ok) {
-                        const data = await res.json();
-                        if (data.files && data.files.length > 0) {
-                            gdriveFileId = data.files[0].id;
-                        } else {
-                            gdriveFileId = null;
-                        }
-                    }
-                } catch(e) {
-                    console.error('查詢 Drive 檔案失敗:', e);
-                }
-            }
-
-            document.getElementById('btnGDriveFetch').addEventListener('click', async () => {
-                if (!gdriveAccessToken) return alert('請先連線 Google 雲端硬碟！');
-                await findGDriveFile();
-                if (!gdriveFileId) return alert('Google 雲端硬碟中尚未有備份檔案！請先點擊「上傳」建立雲端檔案。');
-
-                try {
-                    const res = await fetch(`https://www.googleapis.com/drive/v3/files/${gdriveFileId}?alt=media`, {
+                    const res = await fetch(`https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=${q}&fields=files(id,name,modifiedTime,size)`, {
                         headers: { 'Authorization': `Bearer ${gdriveAccessToken}` }
                     });
                     if (!res.ok) throw new Error(await res.text());
-                    const cloudData = await res.json();
+                    const data = await res.json();
+                    if (data.files && data.files.length > 0) {
+                        gdriveFileMetadata = data.files[0];
+                        gdriveFileId = gdriveFileMetadata.id;
+                    } else {
+                        gdriveFileId = null;
+                        gdriveFileMetadata = null;
+                    }
+                    return gdriveFileMetadata;
+                } catch(e) {
+                    gdriveFileId = null;
+                    gdriveFileMetadata = null;
+                    console.error('查詢 Drive 檔案失敗:', e);
+                    return null;
+                }
+            }
+
+            async function readGDrivePresetFile() {
+                await findGDriveFile();
+                if (!gdriveFileId) throw new Error('Google 雲端硬碟中尚未有備份檔案，請先點擊「上傳」建立。');
+                const res = await fetch(`https://www.googleapis.com/drive/v3/files/${gdriveFileId}?alt=media`, {
+                    headers: { 'Authorization': `Bearer ${gdriveAccessToken}` }
+                });
+                if (!res.ok) throw new Error(await res.text());
+                const cloudData = await res.json();
+                if (!cloudData || typeof cloudData !== 'object' || Array.isArray(cloudData)) {
+                    throw new Error('雲端檔案不是有效的預設包 JSON。');
+                }
+                return cloudData;
+            }
+
+            function buildGDrivePresetSummary(cloudData) {
+                const lines = [`格式版本：${cloudData.version ?? '未標示'}`];
+                const globalPresets = cloudData.globalPresets && typeof cloudData.globalPresets === 'object'
+                    ? cloudData.globalPresets
+                    : {};
+                const filePresets = cloudData.fileScopedPresets && typeof cloudData.fileScopedPresets === 'object'
+                    ? cloudData.fileScopedPresets
+                    : {};
+
+                const globalEntries = Object.entries(globalPresets);
+                const globalRuleCount = globalEntries.reduce((count, [, group]) => (
+                    count + (Array.isArray(group?.rules) ? group.rules.length : 0)
+                ), 0);
+                lines.push(`全域分組：${globalEntries.length} 組／${globalRuleCount} 條規則`);
+                globalEntries.forEach(([name, group]) => {
+                    const ruleCount = Array.isArray(group?.rules) ? group.rules.length : 0;
+                    lines.push(`  • ${name}：${ruleCount} 條${group?.enabled === false ? '（停用）' : ''}`);
+                });
+
+                const fileEntries = Object.entries(filePresets);
+                let fileGroupCount = 0;
+                let fileRuleCount = 0;
+                fileEntries.forEach(([, preset]) => {
+                    const groups = preset?.groups && typeof preset.groups === 'object' ? Object.values(preset.groups) : [];
+                    fileGroupCount += groups.length;
+                    fileRuleCount += groups.reduce((count, group) => (
+                        count + (Array.isArray(group?.rules) ? group.rules.length : 0)
+                    ), 0);
+                });
+                lines.push(`檔案專屬：${fileEntries.length} 個檔案／${fileGroupCount} 組／${fileRuleCount} 條規則`);
+                fileEntries.forEach(([name, preset]) => {
+                    const groups = preset?.groups && typeof preset.groups === 'object' ? Object.values(preset.groups) : [];
+                    const ruleCount = groups.reduce((count, group) => (
+                        count + (Array.isArray(group?.rules) ? group.rules.length : 0)
+                    ), 0);
+                    lines.push(`  • ${name}：${groups.length} 組／${ruleCount} 條${preset?.enabled === false ? '（停用）' : ''}`);
+                });
+                if (!globalEntries.length && !fileEntries.length) {
+                    const legacyEntries = Object.entries(cloudData).filter(([, value]) => Array.isArray(value));
+                    const legacyRuleCount = legacyEntries.reduce((count, [, rules]) => count + rules.length, 0);
+                    lines.push(`舊版套件：${legacyEntries.length} 組／${legacyRuleCount} 條規則`);
+                    legacyEntries.forEach(([name, rules]) => lines.push(`  • ${name}：${rules.length} 條`));
+                }
+                return lines.join('\n');
+            }
+
+            function renderGDrivePreview(cloudData) {
+                const modifiedTime = gdriveFileMetadata?.modifiedTime
+                    ? formatNovelMessageTime(gdriveFileMetadata.modifiedTime)
+                    : '未知';
+                const sizeText = gdriveFileMetadata?.size
+                    ? `${Number(gdriveFileMetadata.size).toLocaleString('zh-TW')} bytes`
+                    : '未知';
+                document.getElementById('gdrivePreviewMeta').textContent = [
+                    `檔名：${gdriveFileMetadata?.name || GDRIVE_FILE_NAME}`,
+                    `最後修改：${modifiedTime}`,
+                    `檔案大小：${sizeText}`
+                ].join('\n');
+                document.getElementById('gdrivePreviewSummary').textContent = buildGDrivePresetSummary(cloudData);
+                document.getElementById('gdrivePreviewRaw').textContent = JSON.stringify(cloudData, null, 2);
+                document.getElementById('gdrivePreviewModal').classList.remove('hidden');
+            }
+
+            function closeGDrivePreview() {
+                document.getElementById('gdrivePreviewModal').classList.add('hidden');
+            }
+
+            document.getElementById('btnGDrivePreviewClose').addEventListener('click', closeGDrivePreview);
+            document.getElementById('btnGDrivePreviewDone').addEventListener('click', closeGDrivePreview);
+            document.getElementById('btnGDriveView').addEventListener('click', async () => {
+                if (!gdriveAccessToken) return alert('請先連線 Google 雲端硬碟！');
+                try {
+                    const cloudData = await readGDrivePresetFile();
+                    renderGDrivePreview(cloudData);
+                } catch(err) {
+                    console.error(err);
+                    alert('查看失敗：' + err.message);
+                }
+            });
+
+            document.getElementById('btnGDriveFetch').addEventListener('click', async () => {
+                if (!gdriveAccessToken) return alert('請先連線 Google 雲端硬碟！');
+
+                try {
+                    const cloudData = await readGDrivePresetFile();
                     
                     if (cloudData.version === 3 || cloudData.globalPresets || cloudData.fileScopedPresets) {
                         scriptEngineData = cloudData;
