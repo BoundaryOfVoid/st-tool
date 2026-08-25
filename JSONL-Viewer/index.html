@@ -132,6 +132,17 @@
         .btn-cloud-action { font-size: 0.85em; padding: 5px; font-weight: bold; background-color: var(--details-bg); color: var(--summary-text); border-color: var(--details-border); }
         #btnExport { font-weight: bold; color: #155724; background-color: #d4edda; border-color: #c3e6cb; margin-top: 5px; }
         body.dark-theme #btnExport { color: #75b798; background-color: #051b11; border-color: #0f5132; }
+        #btnExportNovel { font-weight: bold; color: #4c2a85; background-color: #eee5ff; border-color: #d6c2ff; margin-top: 5px; }
+        body.dark-theme #btnExportNovel { color: #d8c2ff; background-color: #211638; border-color: #60468d; }
+
+        .novel-option-toolbar { display: flex; gap: 6px; margin-bottom: 8px; }
+        .novel-option-toolbar button { width: auto; padding: 4px 9px; font-size: 0.8em; }
+        .novel-tag-options { max-height: 240px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 6px; padding: 6px 10px; margin-bottom: 12px; background: var(--bg-color); }
+        .novel-tag-option { display: flex !important; align-items: center; gap: 8px; margin: 0 !important; padding: 6px 2px; color: var(--text-color) !important; font-weight: 500 !important; border-bottom: 1px dashed var(--border-color); cursor: pointer; }
+        .novel-tag-option:last-child { border-bottom: none; }
+        .novel-tag-option input { width: 15px; height: 15px; margin: 0; flex: 0 0 auto; }
+        .novel-tag-count { margin-left: auto; color: var(--meta-color); font-size: 0.85em; font-weight: 400; }
+        .novel-option-note { margin: 0 0 12px; color: var(--meta-color); font-size: 0.82em; line-height: 1.5; }
 
         .nested-manager-box { background: var(--sys-message-bg); border: 1px solid var(--border-color); padding: 8px; border-radius: 6px; margin-top: 5px; }
         .regex-rule-node { display: flex; justify-content: space-between; align-items: center; background: var(--message-bg); padding: 4px 8px; border-radius: 4px; margin-bottom: 4px; font-size: 0.85em; border: 1px solid var(--border-color); }
@@ -417,12 +428,64 @@
             <div class="nav-section" style="margin-bottom: 0; border-bottom: none;">
                 <label>一般輸出</label>
                 <button id="btnExport">💾 匯出修改後的 JSONL</button>
+                <button id="btnExportNovel">📖 匯出小說 TXT</button>
             </div>
         </div>
     </div>
 
     <div id="output"></div>
     <div id="scrollSentinel"></div>
+
+    <!-- 小說 TXT 匯出選項 -->
+    <div id="novelExportModal" class="modal-overlay hidden">
+        <div class="modal-card">
+            <div class="modal-header">
+                <span>📖 匯出小說 TXT</span>
+                <button class="btn-rule-action" id="btnNovelModalClose" style="font-size:1.1em;">✕</button>
+            </div>
+            <div class="modal-body">
+                <p class="novel-option-note">勾選的區塊會連同內容整段剔除；未勾選的區塊會保留文字內容，但不保留標籤外殼。</p>
+
+                <label>要剔除的區塊</label>
+                <div class="novel-option-toolbar">
+                    <button type="button" id="btnNovelSelectAll">全部勾選</button>
+                    <button type="button" id="btnNovelSelectNone">全部取消</button>
+                </div>
+                <div id="novelTagOptions" class="novel-tag-options"></div>
+
+                <label for="novelCustomRemoveTags">額外剔除的標籤（逗號或換行分隔）</label>
+                <textarea id="novelCustomRemoveTags" rows="2" placeholder="例如：metadata, ooc"></textarea>
+
+                <label for="novelMvuMode">MVU 狀態欄</label>
+                <select id="novelMvuMode">
+                    <option value="readable">轉成易讀狀態欄</option>
+                    <option value="remove">完全移除</option>
+                    <option value="keep">保留原始佔位標籤</option>
+                </select>
+
+                <label class="novel-tag-option" style="border:0; padding:2px 0 0;">
+                    <input type="checkbox" id="novelIncludeSpeakerLabels" checked>
+                    <span>在玩家與角色回覆前加上【名稱】</span>
+                </label>
+                <label class="novel-tag-option" style="border:0; padding:6px 0 0;">
+                    <input type="checkbox" id="novelIncludeFloorId" checked>
+                    <span>顯示酒館樓層 ID</span>
+                </label>
+                <label class="novel-tag-option" style="border:0; padding:6px 0 0;">
+                    <input type="checkbox" id="novelIncludeTimestamp" checked>
+                    <span>顯示訊息時間</span>
+                </label>
+                <label class="novel-tag-option" style="border:0; padding:6px 0 0;">
+                    <input type="checkbox" id="novelIncludeModel" checked>
+                    <span>顯示角色回覆的模型名稱</span>
+                </label>
+            </div>
+            <div class="modal-footer">
+                <button id="btnNovelCancel" style="width:auto;">取消</button>
+                <button id="btnNovelConfirm" style="width:auto; background:var(--accent-color); color:#fff; font-weight:bold;">匯出 TXT</button>
+            </div>
+        </div>
+    </div>
 
     <!-- 條目編輯彈窗 (Edit Rule Modal) -->
     <div id="editRuleModal" class="modal-overlay hidden">
@@ -499,6 +562,227 @@
         let searchResults = [];
         let currentSearchFloorIndex = -1;
         let currentMarkIndex = 0;
+
+        // Viewer 端的最小 Mvu 相容層：讓酒館訊息中的 UpdateVariable/JSONPatch
+        // 能在離線 JSONL 檢視器裡重建狀態，供角色卡讀取。
+        const VIEWER_VARIABLE_UPDATE_EVENT = 'VARIABLE_UPDATE_ENDED';
+        let viewerVariables = { stat_data: {} };
+        let viewerMessageStates = new Map();
+        const viewerVariableHandlers = new Map();
+
+        function resetViewerVariableRuntime() {
+            viewerVariables = { stat_data: {} };
+            viewerMessageStates.clear();
+            viewerVariableHandlers.clear();
+        }
+
+        function decodeViewerEntities(value) {
+            return String(value ?? '')
+                .replace(/&#x([0-9a-f]+);?/gi, (_, hex) => String.fromCodePoint(parseInt(hex, 16)))
+                .replace(/&#([0-9]+);?/g, (_, decimal) => String.fromCodePoint(parseInt(decimal, 10)))
+                .replace(/&(amp|lt|gt|quot|apos|nbsp);/gi, (_, name) => ({
+                    amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' '
+                }[name.toLowerCase()]));
+        }
+
+        function normalizeViewerControlTags(text) {
+            return String(text ?? '')
+                .replace(/\\?&lt;(\/?(?:UpdateVariable|JSONPatch|StatusPlaceHolderImpl|BeastStatusPlaceHolder)\b[\s\S]*?)&gt;/gi, '<$1>')
+                .replace(/\\(?=<\/?(?:UpdateVariable|JSONPatch|StatusPlaceHolderImpl|BeastStatusPlaceHolder)\b)/gi, '');
+        }
+
+        function getAllVariables() {
+            return viewerVariables;
+        }
+
+        function getViewerPathSegments(path) {
+            const rawSegments = String(path ?? '').split('/').slice(1)
+                .map(segment => segment.replace(/~1/g, '/').replace(/~0/g, '~'));
+            if (rawSegments[0] === 'stat_data') return rawSegments;
+            return ['stat_data', ...rawSegments];
+        }
+
+        function cloneViewerPatchValue(value) {
+            if (value === undefined || value === null || typeof value !== 'object') return value;
+            return JSON.parse(JSON.stringify(value));
+        }
+
+        function getViewerPatchParent(segments) {
+            let target = viewerVariables;
+            for (let i = 0; i < segments.length - 1; i++) {
+                const key = segments[i];
+                const nextKey = segments[i + 1];
+                if (target[key] === undefined || target[key] === null || typeof target[key] !== 'object') {
+                    target[key] = nextKey === '-' || /^\d+$/.test(nextKey) ? [] : {};
+                }
+                target = target[key];
+            }
+            return { parent: target, key: segments[segments.length - 1] };
+        }
+
+        function applyViewerJsonPatch(patch) {
+            if (!patch || typeof patch !== 'object') return false;
+            const operation = String(patch.op || '').toLowerCase();
+            const segments = getViewerPathSegments(patch.path);
+            if (!segments.length) return false;
+
+            if (segments.length === 1 && segments[0] === 'stat_data') {
+                if (operation === 'remove') viewerVariables.stat_data = {};
+                else if (operation === 'replace' || operation === 'add' || operation === 'insert') {
+                    viewerVariables.stat_data = cloneViewerPatchValue(patch.value) || {};
+                }
+                return ['remove', 'replace', 'add', 'insert'].includes(operation);
+            }
+
+            const { parent, key } = getViewerPatchParent(segments);
+            if (parent === undefined || parent === null) return false;
+
+            if (operation === 'remove') {
+                if (Array.isArray(parent)) {
+                    const index = Number(key);
+                    if (Number.isInteger(index) && index >= 0 && index < parent.length) parent.splice(index, 1);
+                } else {
+                    delete parent[key];
+                }
+                return true;
+            }
+
+            if (operation === 'delta') {
+                const current = Number(parent[key]) || 0;
+                parent[key] = current + (Number(patch.value) || 0);
+                return true;
+            }
+
+            if (operation === 'insert' || (operation === 'add' && Array.isArray(parent))) {
+                if (key === '-') parent.push(cloneViewerPatchValue(patch.value));
+                else {
+                    const index = Number(key);
+                    if (Number.isInteger(index) && index >= 0) parent.splice(index, 0, cloneViewerPatchValue(patch.value));
+                }
+                return true;
+            }
+
+            if (operation === 'replace' || operation === 'add') {
+                parent[key] = cloneViewerPatchValue(patch.value);
+                return true;
+            }
+            return false;
+        }
+
+        function emitViewerVariableUpdate() {
+            const handlers = viewerVariableHandlers.get(VIEWER_VARIABLE_UPDATE_EVENT);
+            if (!handlers) return;
+            [...handlers].forEach(handler => {
+                try {
+                    const result = handler();
+                    if (result && typeof result.catch === 'function') result.catch(console.error);
+                } catch (error) {
+                    console.error('角色卡更新失敗：', error);
+                }
+            });
+        }
+
+        function eventOn(eventName, handler) {
+            if (typeof handler !== 'function') return () => {};
+            if (!viewerVariableHandlers.has(eventName)) viewerVariableHandlers.set(eventName, new Set());
+            const handlers = viewerVariableHandlers.get(eventName);
+            handlers.add(handler);
+            return () => handlers.delete(handler);
+        }
+
+        function waitGlobalInitialized() {
+            return Promise.resolve();
+        }
+
+        function errorCatched(handler) {
+            return function (...args) {
+                try {
+                    const result = handler(...args);
+                    if (result && typeof result.catch === 'function') result.catch(console.error);
+                    return result;
+                } catch (error) {
+                    console.error('角色卡腳本失敗：', error);
+                    return undefined;
+                }
+            };
+        }
+
+        function viewerGet(object, path, defaultValue) {
+            if (object === undefined || object === null) return defaultValue;
+            const segments = Array.isArray(path) ? path : String(path ?? '').split('.').filter(Boolean);
+            let value = object;
+            for (const segment of segments) {
+                if (value === undefined || value === null || !(segment in Object(value))) return defaultValue;
+                value = value[segment];
+            }
+            return value === undefined ? defaultValue : value;
+        }
+
+        function installViewerCardRuntime() {
+            window._ = { get: viewerGet };
+            window.Mvu = { events: { VARIABLE_UPDATE_ENDED: VIEWER_VARIABLE_UPDATE_EVENT } };
+            window.getAllVariables = getAllVariables;
+            window.waitGlobalInitialized = waitGlobalInitialized;
+            window.eventOn = eventOn;
+            window.errorCatched = errorCatched;
+            window.$ = callback => {
+                if (typeof callback !== 'function') return callback;
+                return callback();
+            };
+        }
+
+        function consumeViewerVariableUpdates(text, applyUpdates = true) {
+            let visibleText = normalizeViewerControlTags(text);
+            const updatePattern = /<UpdateVariable\b[^>]*>[\s\S]*?<\/UpdateVariable\s*>/gi;
+            return visibleText.replace(updatePattern, block => {
+                const patchMatch = block.match(/<JSONPatch\b[^>]*>([\s\S]*?)<\/JSONPatch\s*>/i);
+                if (!patchMatch) return '';
+
+                let patchText = decodeViewerEntities(patchMatch[1]).trim();
+                patchText = patchText.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+                try {
+                    const patches = JSON.parse(patchText);
+                    if (!Array.isArray(patches)) return '';
+                    if (applyUpdates) {
+                        let changed = false;
+                        patches.forEach(patch => { changed = applyViewerJsonPatch(patch) || changed; });
+                        if (changed) emitViewerVariableUpdate();
+                    }
+                } catch (error) {
+                    console.warn('無法解析 UpdateVariable 的 JSONPatch：', error);
+                }
+                return '';
+            });
+        }
+
+        function getViewerVariablesSnapshot(rawVariables) {
+            const candidates = Array.isArray(rawVariables) ? rawVariables : [rawVariables];
+            return candidates.find(value => (
+                value && typeof value === 'object' &&
+                value.stat_data && typeof value.stat_data === 'object'
+            )) || null;
+        }
+
+        function applyViewerVariablesSnapshot(rawVariables) {
+            const snapshot = getViewerVariablesSnapshot(rawVariables);
+            if (!snapshot) return false;
+            viewerVariables = cloneViewerPatchValue(snapshot);
+            return true;
+        }
+
+        function rebuildViewerMessageStates() {
+            viewerMessageStates.clear();
+            viewerVariables = { stat_data: {} };
+            viewerVariableHandlers.clear();
+
+            const chatOnlyData = globalParsedData.filter(item => item.mes !== undefined && item.mes !== null);
+            chatOnlyData.forEach(item => {
+                const hasVariableSnapshot = applyViewerVariablesSnapshot(item.variables);
+                // 完整快照已包含該樓最終狀態，只消化控制標籤，不再次套用 patch。
+                consumeViewerVariableUpdates(item.mes, !hasVariableSnapshot);
+                viewerMessageStates.set(item._local_id, cloneViewerPatchValue(viewerVariables));
+            });
+        }
 
         function getModelName(item) {
             if (!item || item.is_user) return '';
@@ -588,7 +872,7 @@
                 let match = false;
                 if (target === 'all' || target === 'mes') {
                     let tempDiv = document.createElement('div');
-                    tempDiv.innerHTML = processCustomTags(mesText);
+                    tempDiv.innerHTML = processCustomTags(mesText, { applyVariableUpdates: false });
                     if (target === 'mes') {
                         tempDiv.querySelectorAll('details').forEach(d => d.remove());
                     }
@@ -675,7 +959,197 @@
             ]
         };
 
+        function getRuleScopeClass(rule) {
+            const rawId = String(rule?.id || 'anonymous');
+            const safeId = rawId.replace(/[^a-zA-Z0-9_-]/g, '-');
+            return 'st-rule-scope-' + (safeId || 'anonymous');
+        }
+
+        function splitLeadingCssTrivia(text) {
+            let index = 0;
+            while (index < text.length) {
+                const whitespace = text.slice(index).match(/^\s+/);
+                if (whitespace) {
+                    index += whitespace[0].length;
+                    continue;
+                }
+                if (text.startsWith('/*', index)) {
+                    const commentEnd = text.indexOf('*/', index + 2);
+                    if (commentEnd === -1) break;
+                    index = commentEnd + 2;
+                    continue;
+                }
+                break;
+            }
+            return { leading: text.slice(0, index), rest: text.slice(index) };
+        }
+
+        function findCssOpeningBrace(cssText, startIndex) {
+            let quote = null;
+            for (let i = startIndex; i < cssText.length; i++) {
+                const ch = cssText[i];
+                if (quote) {
+                    if (ch === quote && cssText[i - 1] !== '\\') quote = null;
+                    continue;
+                }
+                if (cssText.startsWith('/*', i)) {
+                    const commentEnd = cssText.indexOf('*/', i + 2);
+                    if (commentEnd === -1) return -1;
+                    i = commentEnd + 1;
+                    continue;
+                }
+                if (ch === '"' || ch === "'") {
+                    quote = ch;
+                    continue;
+                }
+                if (ch === '{') return i;
+            }
+            return -1;
+        }
+
+        function findCssClosingBrace(cssText, openingIndex) {
+            let quote = null;
+            let depth = 1;
+            for (let i = openingIndex + 1; i < cssText.length; i++) {
+                const ch = cssText[i];
+                if (quote) {
+                    if (ch === quote && cssText[i - 1] !== '\\') quote = null;
+                    continue;
+                }
+                if (cssText.startsWith('/*', i)) {
+                    const commentEnd = cssText.indexOf('*/', i + 2);
+                    if (commentEnd === -1) return -1;
+                    i = commentEnd + 1;
+                    continue;
+                }
+                if (ch === '"' || ch === "'") {
+                    quote = ch;
+                    continue;
+                }
+                if (ch === '{') depth++;
+                if (ch === '}') {
+                    depth--;
+                    if (depth === 0) return i;
+                }
+            }
+            return -1;
+        }
+
+        function splitCssSelectors(selectorText) {
+            const selectors = [];
+            let current = '';
+            let quote = null;
+            let parenDepth = 0;
+            let bracketDepth = 0;
+
+            for (let i = 0; i < selectorText.length; i++) {
+                const ch = selectorText[i];
+                if (quote) {
+                    current += ch;
+                    if (ch === quote && selectorText[i - 1] !== '\\') quote = null;
+                    continue;
+                }
+                if (ch === '"' || ch === "'") {
+                    quote = ch;
+                    current += ch;
+                    continue;
+                }
+                if (ch === '(') parenDepth++;
+                if (ch === ')') parenDepth = Math.max(0, parenDepth - 1);
+                if (ch === '[') bracketDepth++;
+                if (ch === ']') bracketDepth = Math.max(0, bracketDepth - 1);
+                if (ch === ',' && parenDepth === 0 && bracketDepth === 0) {
+                    if (current.trim()) selectors.push(current.trim());
+                    current = '';
+                } else {
+                    current += ch;
+                }
+            }
+            if (current.trim()) selectors.push(current.trim());
+            return selectors;
+        }
+
+        function scopeSingleCssSelector(selector, scopeSelector) {
+            const trimmed = selector.trim();
+            if (!trimmed) return '';
+            if (trimmed === '*') return `${scopeSelector}, ${scopeSelector} *`;
+
+            let scoped = trimmed
+                .replace(/(^|[\s>+~])(?:html|body)\b/g, `$1${scopeSelector}`)
+                .replace(/:root\b/g, scopeSelector);
+
+            const alreadyScoped = scoped === scopeSelector
+                || scoped.startsWith(scopeSelector + ' ')
+                || scoped.startsWith(scopeSelector + '.')
+                || scoped.startsWith(scopeSelector + '#')
+                || scoped.startsWith(scopeSelector + '[')
+                || scoped.startsWith(scopeSelector + ':');
+            return alreadyScoped ? scoped : `${scopeSelector} ${scoped}`;
+        }
+
+        function scopeCssText(cssText, scopeClass) {
+            if (!cssText || !cssText.trim()) return '';
+            const scopeSelector = '.' + scopeClass;
+            const nestedAtRules = new Set(['media', 'supports', 'container', 'layer', 'document', 'scope']);
+
+            function processBlock(block) {
+                let result = '';
+                let cursor = 0;
+                while (cursor < block.length) {
+                    const openingIndex = findCssOpeningBrace(block, cursor);
+                    if (openingIndex === -1) {
+                        result += block.slice(cursor);
+                        break;
+                    }
+                    const closingIndex = findCssClosingBrace(block, openingIndex);
+                    if (closingIndex === -1) {
+                        result += block.slice(cursor);
+                        break;
+                    }
+
+                    const header = block.slice(cursor, openingIndex);
+                    const body = block.slice(openingIndex + 1, closingIndex);
+                    const trivia = splitLeadingCssTrivia(header);
+                    const headerRest = trivia.rest;
+                    const firstNonWhitespace = headerRest.search(/\S/);
+
+                    if (firstNonWhitespace === -1) {
+                        result += header + '{' + body + '}';
+                        cursor = closingIndex + 1;
+                        continue;
+                    }
+
+                    const coreStart = firstNonWhitespace;
+                    const coreEnd = headerRest.trimEnd().length;
+                    const beforeCore = headerRest.slice(0, coreStart);
+                    const core = headerRest.slice(coreStart, coreEnd);
+                    const afterCore = headerRest.slice(coreEnd);
+                    let transformedCore = core;
+                    let transformedBody = body;
+
+                    const atRuleMatch = core.match(/^@([a-z-]+)/i);
+                    if (atRuleMatch) {
+                        if (nestedAtRules.has(atRuleMatch[1].toLowerCase())) {
+                            transformedBody = processBlock(body);
+                        }
+                    } else {
+                        transformedCore = splitCssSelectors(core)
+                            .map(selector => scopeSingleCssSelector(selector, scopeSelector))
+                            .filter(Boolean)
+                            .join(', ');
+                    }
+
+                    result += trivia.leading + beforeCore + transformedCore + afterCore + '{' + transformedBody + '}';
+                    cursor = closingIndex + 1;
+                }
+                return result;
+            }
+
+            return processBlock(cssText);
+        }
+
         function injectDynamicCSS(cssText) {
+            if (!cssText || !cssText.trim()) return;
             if (!dynamicStyleTag) {
                 dynamicStyleTag = document.createElement('style');
                 dynamicStyleTag.id = 'st-dynamic-injected-css';
@@ -692,6 +1166,327 @@
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url; a.download = filename; document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+        }
+
+        function downloadText(text, filename) {
+            const blob = new Blob(['\uFEFF', text], { type: 'text/plain;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        const NOVEL_REASONING_FIELD = '__reasoning_fields__';
+        const NOVEL_DEFAULT_REMOVED_TAGS = new Set([
+            NOVEL_REASONING_FIELD,
+            'thinking', 'reasoning', 'analysis',
+            'meow_fm', 'profile', 'branches',
+            'updatevariable', 'jsonpatch',
+            'script', 'style'
+        ]);
+        const NOVEL_STATUS_TAGS = new Set(['statusplaceholderimpl', 'beaststatusplaceholder']);
+
+        function escapeNovelRegex(value) {
+            return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        }
+
+        function normalizeNovelSource(text) {
+            return decodeViewerEntities(text)
+                .replace(/\\(?=<\/?[A-Za-z][\w:.-]*\b)/g, '')
+                .replace(/\r\n?/g, '\n');
+        }
+
+        function detectNovelExportBlocks() {
+            const detected = new Map();
+
+            globalParsedData.forEach(item => {
+                if (item.mes === undefined || item.mes === null) return;
+
+                if (item.extra?.reasoning || item.reasoning) {
+                    const entry = detected.get(NOVEL_REASONING_FIELD) || {
+                        key: NOVEL_REASONING_FIELD,
+                        name: 'reasoning 欄位（思維鏈）',
+                        count: 0
+                    };
+                    entry.count++;
+                    detected.set(NOVEL_REASONING_FIELD, entry);
+                }
+
+                const source = normalizeNovelSource(item.mes);
+                const openPattern = /<([A-Za-z][\w:.-]*)\b[^>]*>/g;
+                let match;
+                while ((match = openPattern.exec(source)) !== null) {
+                    if (/\/\s*>$/.test(match[0])) continue;
+                    const name = match[1];
+                    const key = name.toLowerCase();
+                    if (NOVEL_STATUS_TAGS.has(key)) continue;
+                    const closePattern = new RegExp(`<\\/${escapeNovelRegex(name)}\\s*>`, 'i');
+                    if (!closePattern.test(source.slice(openPattern.lastIndex))) continue;
+                    const entry = detected.get(key) || { key, name, count: 0 };
+                    entry.count++;
+                    detected.set(key, entry);
+                }
+            });
+
+            return [...detected.values()].sort((a, b) => {
+                const aDefault = NOVEL_DEFAULT_REMOVED_TAGS.has(a.key) ? 0 : 1;
+                const bDefault = NOVEL_DEFAULT_REMOVED_TAGS.has(b.key) ? 0 : 1;
+                return aDefault - bDefault || a.name.localeCompare(b.name, 'zh-Hant');
+            });
+        }
+
+        function renderNovelTagOptions() {
+            const container = document.getElementById('novelTagOptions');
+            container.replaceChildren();
+            const blocks = detectNovelExportBlocks();
+
+            if (!blocks.length) {
+                const empty = document.createElement('div');
+                empty.className = 'novel-option-note';
+                empty.style.margin = '4px 0';
+                empty.textContent = '目前檔案沒有偵測到成對區塊標籤。';
+                container.appendChild(empty);
+                return;
+            }
+
+            blocks.forEach(block => {
+                const label = document.createElement('label');
+                label.className = 'novel-tag-option';
+
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.className = 'novel-remove-tag';
+                checkbox.value = block.key;
+                checkbox.checked = NOVEL_DEFAULT_REMOVED_TAGS.has(block.key);
+
+                const name = document.createElement('span');
+                name.textContent = block.key === NOVEL_REASONING_FIELD ? block.name : `<${block.name}>`;
+
+                const count = document.createElement('span');
+                count.className = 'novel-tag-count';
+                count.textContent = `${block.count} 處`;
+
+                label.append(checkbox, name, count);
+                container.appendChild(label);
+            });
+        }
+
+        function openNovelExportModal() {
+            if (!globalParsedData.some(item => item.mes !== undefined && item.mes !== null)) {
+                alert('沒有可匯出的對話資料！');
+                return;
+            }
+            renderNovelTagOptions();
+            document.getElementById('novelExportModal').classList.remove('hidden');
+        }
+
+        function closeNovelExportModal() {
+            document.getElementById('novelExportModal').classList.add('hidden');
+        }
+
+        function getNovelRemoveTags() {
+            const selected = new Set(
+                [...document.querySelectorAll('.novel-remove-tag:checked')].map(input => input.value.toLowerCase())
+            );
+            document.getElementById('novelCustomRemoveTags').value
+                .split(/[,，\n]/)
+                .map(tag => tag.trim().replace(/^<\/?|\/?>$/g, '').toLowerCase())
+                .filter(Boolean)
+                .forEach(tag => selected.add(tag));
+            return selected;
+        }
+
+        function removeNovelTaggedBlock(text, tagName) {
+            if (!tagName || tagName === NOVEL_REASONING_FIELD || NOVEL_STATUS_TAGS.has(tagName)) return text;
+            const escapedTag = escapeNovelRegex(tagName);
+            const tokenPattern = new RegExp(`<\\/?${escapedTag}\\b[^>]*>`, 'gi');
+            const ranges = [];
+            let depth = 0;
+            let blockStart = -1;
+            let match;
+
+            while ((match = tokenPattern.exec(text)) !== null) {
+                const token = match[0];
+                const isClosing = /^<\//.test(token);
+                const isSelfClosing = /\/\s*>$/.test(token);
+
+                if (isSelfClosing) {
+                    if (depth === 0) ranges.push([match.index, tokenPattern.lastIndex]);
+                    continue;
+                }
+                if (!isClosing) {
+                    if (depth === 0) blockStart = match.index;
+                    depth++;
+                    continue;
+                }
+                if (depth === 0) continue;
+                depth--;
+                if (depth === 0 && blockStart >= 0) {
+                    ranges.push([blockStart, tokenPattern.lastIndex]);
+                    blockStart = -1;
+                }
+            }
+
+            let result = text;
+            ranges.reverse().forEach(([start, end]) => {
+                result = result.slice(0, start) + result.slice(end);
+            });
+            return result;
+        }
+
+        function novelScalar(value) {
+            if (value === null || value === undefined || value === '') return '';
+            if (typeof value === 'boolean') return value ? '是' : '否';
+            if (Array.isArray(value)) {
+                return value.map(item => {
+                    if (item && typeof item === 'object') return JSON.stringify(item);
+                    return novelScalar(item);
+                }).filter(Boolean).join('、');
+            }
+            return String(value);
+        }
+
+        function appendReadableNovelState(lines, value, path) {
+            if (value === null || value === undefined || value === '') return;
+            if (Array.isArray(value) || typeof value !== 'object') {
+                const scalar = novelScalar(value);
+                if (scalar) lines.push(`${path}：${scalar}`);
+                return;
+            }
+
+            const entries = Object.entries(value).filter(([, child]) => child !== null && child !== undefined && child !== '');
+            const scalarEntries = entries.filter(([, child]) => !child || typeof child !== 'object' || Array.isArray(child));
+            const nestedEntries = entries.filter(([, child]) => child && typeof child === 'object' && !Array.isArray(child));
+
+            if (scalarEntries.length) {
+                const summary = scalarEntries
+                    .map(([key, child]) => `${key} ${novelScalar(child)}`)
+                    .filter(part => !part.endsWith(' '))
+                    .join('｜');
+                if (summary) lines.push(`${path}：${summary}`);
+            }
+            nestedEntries.forEach(([key, child]) => {
+                appendReadableNovelState(lines, child, path ? `${path}／${key}` : key);
+            });
+        }
+
+        function formatNovelMvuState(messageState) {
+            const statData = messageState?.stat_data;
+            const lines = ['[MVU]', ''];
+            if (!statData || typeof statData !== 'object' || !Object.keys(statData).length) {
+                lines.push('（此樓沒有可用的 stat_data）');
+                return `\`\`\`\n${lines.join('\n')}\n\`\`\``;
+            }
+            Object.entries(statData).forEach(([key, value]) => appendReadableNovelState(lines, value, key));
+            return `\`\`\`\n${lines.join('\n')}\n\`\`\``;
+        }
+
+        function formatNovelMessageTime(sendDate) {
+            if (sendDate === undefined || sendDate === null || sendDate === '') return '';
+            const date = new Date(sendDate);
+            if (Number.isNaN(date.getTime())) return String(sendDate);
+            const pad = value => String(value).padStart(2, '0');
+            return `${date.getFullYear()}/${date.getMonth() + 1}/${date.getDate()} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+        }
+
+        function cleanNovelMessage(text, options, messageState) {
+            let result = normalizeNovelSource(text);
+            const preservedStatuses = [];
+            result = result.replace(/<!--[\s\S]*?-->/g, '');
+            options.removeTags.forEach(tag => {
+                result = removeNovelTaggedBlock(result, tag);
+            });
+
+            const statusPattern = /<(?:StatusPlaceHolderImpl|BeastStatusPlaceHolder)\b[^>]*\/\s*>/gi;
+            if (options.mvuMode === 'readable') {
+                result = result.replace(statusPattern, () => {
+                    const index = preservedStatuses.push(formatNovelMvuState(messageState)) - 1;
+                    return `\n\nNOVELMVUSTATUS${index}TOKEN\n\n`;
+                });
+            } else if (options.mvuMode === 'remove') {
+                result = result.replace(statusPattern, '');
+            } else {
+                result = result.replace(statusPattern, match => {
+                    const index = preservedStatuses.push(match) - 1;
+                    return `\n\nNOVELMVUSTATUS${index}TOKEN\n\n`;
+                });
+            }
+
+            result = result
+                .replace(/<br\s*\/?>/gi, '\n')
+                .replace(/<li\b[^>]*>/gi, '\n• ')
+                .replace(/<\/(?:p|div|section|article|details|summary|li|tr|h[1-6])\s*>/gi, '\n')
+                .replace(/<\/?[A-Za-z][\w:.-]*\b[^>]*>/g, '')
+                .replace(/^\s*\\?```[^\n]*$/gm, '')
+                .replace(/^\s{0,3}#{1,6}\s+/gm, '')
+                .replace(/^\s*>\s?/gm, '')
+                .replace(/^\s*(?:-{3,}|\*{3,}|_{3,})\s*$/gm, '')
+                .replace(/!\[([^\]]*)\]\([^)]*\)/g, '$1')
+                .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
+                .replace(/(\*\*|__)([\s\S]*?)\1/g, '$2')
+                .replace(/~~([\s\S]*?)~~/g, '$1')
+                .replace(/`([^`]+)`/g, '$1')
+                .replace(/[ \t]+\n/g, '\n')
+                .replace(/\n[ \t]+/g, '\n')
+                .replace(/\n{3,}/g, '\n\n')
+                .trim();
+
+            preservedStatuses.forEach((status, index) => {
+                result = result.replace(`NOVELMVUSTATUS${index}TOKEN`, status);
+            });
+
+            return result;
+        }
+
+        function buildNovelText(options) {
+            rebuildViewerMessageStates();
+            const sections = [];
+            globalParsedData.forEach(item => {
+                // 酒館有時會把正常角色正文標成 is_system；只以 mes 判斷，避免漏掉小說段落。
+                if (item.mes === undefined || item.mes === null) return;
+
+                let source = String(item.mes);
+                if (!options.removeTags.has(NOVEL_REASONING_FIELD)) {
+                    const reasoning = item.extra?.reasoning || item.reasoning || '';
+                    if (reasoning) source = `<reasoning-field>${reasoning}</reasoning-field>\n\n${source}`;
+                }
+
+                const cleaned = cleanNovelMessage(source, options, viewerMessageStates.get(item._local_id));
+                if (!cleaned) return;
+
+                const heading = [];
+                if (options.includeFloorId) heading.push(`[酒館: #${item._local_id}]`);
+                if (options.includeTimestamp) {
+                    const timestamp = formatNovelMessageTime(item.send_date);
+                    if (timestamp) heading.push(`[${timestamp}]`);
+                }
+                if (options.includeSpeakerLabels) {
+                    heading.push(`【${item.name || (item.is_user ? '使用者' : '角色')}】`);
+                }
+                if (options.includeModel) {
+                    const modelName = getModelName(item);
+                    if (modelName) heading.push(`[${modelName}]`);
+                }
+                sections.push(heading.length ? `${heading.join(' ')}\n${cleaned}` : cleaned);
+            });
+            return sections.join('\n\n').replace(/\n{3,}/g, '\n\n').trim();
+        }
+
+        function getExportBaseName() {
+            let baseName = document.getElementById('fileNameDisplay').textContent.replace('📄 ', '');
+            if (baseName === '點此載入檔案') baseName = 'chat';
+            if (baseName.includes('.')) baseName = baseName.substring(0, baseName.lastIndexOf('.'));
+            return baseName;
+        }
+
+        function getExportTimestamp() {
+            const now = new Date();
+            const pad = value => value.toString().padStart(2, '0');
+            return `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
         }
 
         function updateFontSize(type, delta) {
@@ -793,7 +1588,9 @@
                 Object.values(scriptEngineData.globalPresets).forEach(group => {
                     if (group.enabled && Array.isArray(group.rules)) {
                         group.rules.forEach(r => {
-                            if (r.enabled && r.customCss) aggregatedCss += '\n' + r.customCss;
+                            if (r.enabled && r.customCss) {
+                                aggregatedCss += '\n' + scopeCssText(r.customCss, getRuleScopeClass(r));
+                            }
                         });
                     }
                 });
@@ -805,7 +1602,9 @@
                     Object.values(fGroups).forEach(group => {
                         if (group.enabled && Array.isArray(group.rules)) {
                             group.rules.forEach(r => {
-                                if (r.enabled && r.customCss) aggregatedCss += '\n' + r.customCss;
+                                if (r.enabled && r.customCss) {
+                                    aggregatedCss += '\n' + scopeCssText(r.customCss, getRuleScopeClass(r));
+                                }
                             });
                         }
                     });
@@ -1573,15 +2372,39 @@
         // 匯出修改後的檔案
         document.getElementById('btnExport').addEventListener('click', () => {
             if (!globalParsedData.length) return alert('沒有可匯出的資料！');
-            let baseName = document.getElementById('fileNameDisplay').textContent.replace('📄 ', '');
-            if (baseName === '點此載入檔案') baseName = 'chat'; if (baseName.includes('.')) baseName = baseName.substring(0, baseName.lastIndexOf('.'));
-            const now = new Date(); const pad = n => n.toString().padStart(2, '0'); const ts = `${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
-            downloadJSONL(globalParsedData, `${baseName}_edited_${ts}.jsonl`);
+            downloadJSONL(globalParsedData, `${getExportBaseName()}_edited_${getExportTimestamp()}.jsonl`);
+        });
+
+        document.getElementById('btnExportNovel').addEventListener('click', openNovelExportModal);
+        document.getElementById('btnNovelModalClose').addEventListener('click', closeNovelExportModal);
+        document.getElementById('btnNovelCancel').addEventListener('click', closeNovelExportModal);
+        document.getElementById('btnNovelSelectAll').addEventListener('click', () => {
+            document.querySelectorAll('.novel-remove-tag').forEach(input => { input.checked = true; });
+        });
+        document.getElementById('btnNovelSelectNone').addEventListener('click', () => {
+            document.querySelectorAll('.novel-remove-tag').forEach(input => { input.checked = false; });
+        });
+        document.getElementById('btnNovelConfirm').addEventListener('click', () => {
+            const options = {
+                removeTags: getNovelRemoveTags(),
+                mvuMode: document.getElementById('novelMvuMode').value,
+                includeSpeakerLabels: document.getElementById('novelIncludeSpeakerLabels').checked,
+                includeFloorId: document.getElementById('novelIncludeFloorId').checked,
+                includeTimestamp: document.getElementById('novelIncludeTimestamp').checked,
+                includeModel: document.getElementById('novelIncludeModel').checked
+            };
+            const novel = buildNovelText(options);
+            if (!novel) return alert('依照目前的剔除選項，沒有可匯出的正文。');
+            downloadText(novel, `${getExportBaseName()}_novel_${getExportTimestamp()}.txt`);
+            closeNovelExportModal();
         });
 
         // ================= 4. 正則標籤與 Markdown 轉譯 =================
-        function processCustomTags(text) {
+        function processCustomTags(text, options = {}) {
             if (!text) return text;
+
+            // 先吃掉酒館的狀態更新標籤，避免它們被 Markdown 當成可見內容。
+            text = consumeViewerVariableUpdates(text, options.applyVariableUpdates !== false);
 
             // 1. 套用全域啟用規則
             if (scriptEngineData.globalPresets) {
@@ -1629,6 +2452,131 @@
             return text;
         }
 
+        function escapeViewerScript(scriptText) {
+            return String(scriptText ?? '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;');
+        }
+
+        function bindViewerCardInteractions(container) {
+            if (!container) return;
+            container.querySelectorAll('.bm-card').forEach(card => {
+                const head = card.querySelector('.bm-head');
+                if (!head || head.getAttribute('data-viewer-toggle-bound') === 'true') return;
+                head.setAttribute('data-viewer-toggle-bound', 'true');
+                // 使用捕獲階段，避免角色卡內原本依賴全域 ID 的 click handler
+                // 和每張卡片的本地切換重複執行或綁到第一張卡。
+                head.addEventListener('click', event => {
+                    if (event && typeof event.stopImmediatePropagation === 'function') {
+                        event.stopImmediatePropagation();
+                    }
+                    card.classList.toggle('open');
+                }, true);
+            });
+        }
+
+        function findViewerCardElementById(card, id) {
+            if (!card || !id) return null;
+            if (card.id === id) return card;
+            const descendants = card.querySelectorAll('[id]');
+            for (const element of descendants) {
+                if (element.id === id) return element;
+            }
+            return null;
+        }
+
+        function createViewerCardDocument(card) {
+            if (!card) return document;
+            return new Proxy(document, {
+                get(target, property, receiver) {
+                    if (property === 'getElementById') {
+                        return id => findViewerCardElementById(card, id) || target.getElementById(id);
+                    }
+                    const value = Reflect.get(target, property, receiver);
+                    return typeof value === 'function' ? value.bind(target) : value;
+                }
+            });
+        }
+
+        function renderViewerCardsFromState(container, variablesSnapshot) {
+            if (!container) return;
+            const all = variablesSnapshot || viewerVariables;
+            const statData = viewerGet(all, 'stat_data', {});
+            const getElement = (card, id) => findViewerCardElementById(card, id);
+            const setMetric = (card, prefix, key, value) => {
+                const number = value === undefined || value === null || value === '' ? null : Number(value);
+                const validNumber = number !== null && Number.isFinite(number);
+                const bar = getElement(card, prefix + '-' + key + '-bar');
+                const label = getElement(card, prefix + '-' + key + '-num');
+                if (bar) bar.style.width = validNumber ? number + '%' : '0%';
+                if (label) label.textContent = validNumber ? number : '--';
+            };
+            const map = [['f', '菲德萊爾'], ['b', '布萊克'], ['w', '瓦特恩'], ['d', '威德']];
+
+            container.querySelectorAll('.bm-card').forEach(card => {
+                map.forEach(([prefix, name]) => {
+                    const relation = viewerGet(statData, '獸夫.' + name, {});
+                    setMetric(card, prefix, 't', relation.信任);
+                    setMetric(card, prefix, 'g', relation.戒備);
+                    setMetric(card, prefix, 'c', relation.親近);
+                    setMetric(card, prefix, 'x', relation.創傷壓力);
+
+                    const stage = getElement(card, prefix + '-stage');
+                    if (stage) stage.textContent = relation.階段 || '--';
+                    const memory = getElement(card, prefix + '-memory');
+                    if (memory) {
+                        const memories = Array.isArray(relation.關係記憶) ? relation.關係記憶.slice(-2) : [];
+                        memory.textContent = memories.length ? '記憶：' + memories.join('；') : '';
+                    }
+                });
+
+                const world = getElement(card, 'bm-world');
+                if (world) {
+                    const dateTime = [
+                        viewerGet(statData, '世界.日期', ''),
+                        viewerGet(statData, '世界.時間', '')
+                    ].filter(Boolean).join(' ');
+                    world.textContent = [
+                        dateTime,
+                        viewerGet(statData, '世界.地點', ''),
+                        viewerGet(statData, '世界.當前事件', '')
+                    ].filter(Boolean).join('｜');
+                }
+
+                const foot = getElement(card, 'bm-foot');
+                if (foot) {
+                    const present = viewerGet(statData, '世界.在場角色', []);
+                    foot.textContent = '在場：' + (Array.isArray(present) && present.length ? present.join('、') : '--');
+                }
+            });
+        }
+
+        function runEmbeddedScripts(container, variablesSnapshot = null) {
+            if (!container) return;
+            bindViewerCardInteractions(container);
+            renderViewerCardsFromState(container, variablesSnapshot || viewerVariables);
+            installViewerCardRuntime();
+            container.querySelectorAll('template.st-embedded-script').forEach(template => {
+                if (template.getAttribute('data-executed') === 'true') return;
+                template.setAttribute('data-executed', 'true');
+                const scriptText = template.content ? template.content.textContent : template.textContent;
+                try {
+                    const card = typeof template.closest === 'function' ? template.closest('.bm-card') : null;
+                    const scopedDocument = createViewerCardDocument(card);
+                    const scriptVariables = variablesSnapshot
+                        ? cloneViewerPatchValue(variablesSnapshot)
+                        : viewerVariables;
+                    const scriptGetAllVariables = () => scriptVariables;
+                    const scriptEventOn = variablesSnapshot ? () => () => {} : eventOn;
+                    new Function('document', 'getAllVariables', 'eventOn', scriptText)
+                        .call(window, scopedDocument, scriptGetAllVariables, scriptEventOn);
+                } catch (error) {
+                    console.error('角色卡腳本執行失敗：', error);
+                }
+            });
+        }
+
         function applySingleRule(text, rule) {
             try {
                 let patternStr = rule.findRegex;
@@ -1641,13 +2589,32 @@
                 const rx = new RegExp(patternStr, flags);
                 text = text.replace(rx, function(...args) {
                     let template = rule.replaceString || '';
+                    const scopeClass = getRuleScopeClass(rule);
+                    let shouldScopeOutput = Boolean(rule.customCss && rule.customCss.trim());
                     const styleMatch = template.match(/<style[^>]*>([\s\S]*?)<\/style>/i);
-                    if (styleMatch) { injectDynamicCSS(styleMatch[1]); template = template.replace(/<style[^>]*>([\s\S]*?)<\/style>/i, ''); }
+                    if (styleMatch) {
+                        injectDynamicCSS(scopeCssText(styleMatch[1], scopeClass));
+                        shouldScopeOutput = true;
+                        template = template.replace(/<style[^>]*>([\s\S]*?)<\/style>/i, '');
+                    }
                     template = template.replace(/<\/?(html|head|body|meta)[^>]*>/gi, '');
                     for (let i = 1; i < args.length - 2; i++) {
                         const val = args[i] !== undefined ? args[i] : '';
                         const cleanedVal = marked.parse(val).replace(/^<p>|<\/p>$/g, '').trim();
                         template = template.replace(new RegExp('\\$' + i, 'g'), cleanedVal);
+                    }
+                    // 先放進 inert template，待卡片插入 DOM 後以 Viewer 相容層受控執行。
+                    template = template.replace(/<script\b[^>]*>([\s\S]*?)<\/script>/gi, (_, scriptText) => {
+                        return `<template class="st-embedded-script">${escapeViewerScript(scriptText)}</template>`;
+                    });
+                    template = template.replace(/<!doctype[^>]*>/gi, '');
+                    // 有些酒館正則包會把整段 HTML 包在 Markdown code fence 裡；
+                    // 這層圍欄不能保留，否則 Marked 會把卡片拆成程式碼區塊。
+                    template = template
+                        .replace(/^\s*```(?:html|xml)?\s*\r?\n?/i, '')
+                        .replace(/\r?\n?\s*```\s*$/i, '');
+                    if (shouldScopeOutput && template.trim()) {
+                        return `<div class="${scopeClass}">${template}</div>`;
                     }
                     return template;
                 });
@@ -1665,7 +2632,9 @@
                 if (Array.isArray(globalParsedData[index].swipes) && globalParsedData[index].swipe_id !== undefined) {
                     globalParsedData[index].swipes[globalParsedData[index].swipe_id] = newVal;
                 }
-                contentDiv.innerHTML = processCustomTags(newVal); cleanup();
+                contentDiv.innerHTML = processCustomTags(newVal);
+                runEmbeddedScripts(contentDiv);
+                cleanup();
             };
             btnCancel.onclick = () => cleanup();
             function cleanup() { textarea.remove(); btnSave.remove(); btnCancel.remove(); contentDiv.style.display = 'block'; btnEdit.style.display = 'flex'; }
@@ -1678,6 +2647,8 @@
         }, { rootMargin: '200px' });
 
         function renderOutput() {
+            resetViewerVariableRuntime();
+            rebuildViewerMessageStates();
             document.getElementById('output').innerHTML = ''; renderIndex = 0;
             const sentinel = document.getElementById('scrollSentinel');
             sentinel.textContent = '向下捲動以載入更多...'; renderBatch(BATCH_SIZE);
@@ -1734,13 +2705,23 @@
                 }
 
                 const content = document.createElement('div'); content.className = 'content';
-                let finalMesText = processCustomTags(mesText);
+                let messageState = viewerMessageStates.get(item._local_id);
+                let applyVariableUpdates = false;
+                if (!messageState) {
+                    // 僅作為未經 renderOutput 建立快照時的保底路徑。
+                    const hasVariableSnapshot = applyViewerVariablesSnapshot(item.variables);
+                    applyVariableUpdates = !hasVariableSnapshot;
+                    messageState = cloneViewerPatchValue(viewerVariables);
+                    viewerMessageStates.set(item._local_id, messageState);
+                }
+                let finalMesText = processCustomTags(mesText, { applyVariableUpdates });
                 if (searchKeyword && (searchTarget === 'all' || searchTarget === 'mes')) {
                     finalMesText = highlightText(finalMesText, searchKeyword);
                 }
                 content.innerHTML = finalMesText; div.appendChild(content);
                 const realIndex = globalParsedData.indexOf(item); btnEdit.onclick = () => startEdit(realIndex, div, content, actionsDiv, btnEdit);
                 outputDiv.appendChild(div);
+                runEmbeddedScripts(content, cloneViewerPatchValue(messageState));
             }
             renderIndex = endIndex;
             if (renderIndex >= totalFloors) { document.getElementById('scrollSentinel').textContent = '已載入全部對話'; }
