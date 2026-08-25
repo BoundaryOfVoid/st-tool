@@ -2061,10 +2061,41 @@
             const GOOGLE_CLIENT_ID = "15417722990-5j3m65biqhtf999f9ll7mvdd8dhhi3ee.apps.googleusercontent.com";
             const GDRIVE_FILE_NAME = 'st_character_presets.json';
             const GDRIVE_SCOPES = 'https://www.googleapis.com/auth/drive.appdata https://www.googleapis.com/auth/userinfo.profile';
+            const GDRIVE_CONNECTION_REMEMBER_KEY = 'st_gdrive_connection_remembered';
 
             let gdriveTokenClient = null;
             let gdriveAccessToken = null;
             let gdriveFileId = null;
+            let gdriveAuthRequestMode = 'manual';
+            let gdriveAutoReconnectAttempted = false;
+
+            function isGDriveConnectionRemembered() {
+                try {
+                    return localStorage.getItem(GDRIVE_CONNECTION_REMEMBER_KEY) === '1';
+                } catch(e) {
+                    return false;
+                }
+            }
+
+            function rememberGDriveConnection(remember) {
+                try {
+                    if (remember) localStorage.setItem(GDRIVE_CONNECTION_REMEMBER_KEY, '1');
+                    else localStorage.removeItem(GDRIVE_CONNECTION_REMEMBER_KEY);
+                } catch(e) {}
+            }
+
+            function requestGDriveAccess(silent = false) {
+                if (!gdriveTokenClient) return false;
+                gdriveAuthRequestMode = silent ? 'silent' : 'manual';
+                try {
+                    // 不保存 access token；重新載入時只利用既有 Google 工作階段靜默取得新 token。
+                    gdriveTokenClient.requestAccessToken({ prompt: silent ? 'none' : '' });
+                    return true;
+                } catch(e) {
+                    if (!silent) alert('Google 授權視窗無法開啟，請稍後再試。');
+                    return false;
+                }
+            }
 
             function initGDriveGIS() {
                 if (typeof google === 'undefined' || !google.accounts) {
@@ -2078,6 +2109,10 @@
                         scope: GDRIVE_SCOPES,
                         callback: handleGDriveTokenResponse
                     });
+                    if (isGDriveConnectionRemembered() && !gdriveAutoReconnectAttempted) {
+                        gdriveAutoReconnectAttempted = true;
+                        setTimeout(() => requestGDriveAccess(true), 0);
+                    }
                 } catch(e) {
                     console.error('GIS Init error:', e);
                 }
@@ -2086,13 +2121,15 @@
             document.getElementById('btnGDriveConnect').addEventListener('click', () => {
                 if (!gdriveTokenClient) initGDriveGIS();
                 if (gdriveTokenClient) {
-                    gdriveTokenClient.requestAccessToken({ prompt: 'consent' });
+                    requestGDriveAccess(false);
                 } else {
                     alert('Google Identity 服務載入中，請稍候再試。');
                 }
             });
 
             document.getElementById('btnGDriveLogout').addEventListener('click', () => {
+                rememberGDriveConnection(false);
+                gdriveAutoReconnectAttempted = true;
                 if (gdriveAccessToken && typeof google !== 'undefined' && google.accounts) {
                     google.accounts.oauth2.revoke(gdriveAccessToken, () => {
                         gdriveAccessToken = null;
@@ -2107,8 +2144,16 @@
             });
 
             async function handleGDriveTokenResponse(resp) {
-                if (resp.error) return alert('Google 授權失敗：' + resp.error);
+                if (resp.error) {
+                    gdriveAccessToken = null;
+                    gdriveFileId = null;
+                    updateGDriveUI(false);
+                    // 靜默重連失敗通常表示 Google 工作階段已過期；保留按鈕讓使用者手動登入。
+                    if (gdriveAuthRequestMode !== 'silent') alert('Google 授權失敗：' + resp.error);
+                    return;
+                }
                 gdriveAccessToken = resp.access_token;
+                rememberGDriveConnection(true);
                 updateGDriveUI(true);
 
                 try {
